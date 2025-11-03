@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "59321474403",
+    "project_id": "vulpinenotes",
+    "storage_bucket": "vulpinenotes.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:59321474403:android:43232d4f87d11b2db14756",
+        "android_client_info": {
+          "package_name": "com.example.vulpinenotes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkq1Om5PSvD7ndsje1hBTHuPgeMhDSneE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
