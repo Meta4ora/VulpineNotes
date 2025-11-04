@@ -1,5 +1,7 @@
 package com.example.vulpinenotes
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -8,6 +10,7 @@ import android.widget.EditText
 import android.widget.ImageView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
@@ -20,46 +23,45 @@ class MainActivity : AppCompatActivity() {
     private lateinit var menuButton: ImageView
     private lateinit var navView: NavigationView
 
+    private val PREFS_NAME = "theme_prefs"
+    private val KEY_THEME = "app_theme"
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySavedTheme()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Инициализация
-        drawerLayout = findViewById(R.id.drawer_layout)
-        menuButton = findViewById(R.id.menu_button)
-        searchEditText = findViewById(R.id.search_edit_text)
-        clearButton = findViewById(R.id.clear_button)
-        navView = findViewById(R.id.nav_view)
-
+        initViews()
         setupDrawer()
         setupSearch()
         setupBackPress()
     }
 
+    private fun initViews() {
+        drawerLayout = findViewById(R.id.drawer_layout)
+        menuButton = findViewById(R.id.menu_button)
+        searchEditText = findViewById(R.id.search_edit_text)
+        clearButton = findViewById(R.id.clear_button)
+        navView = findViewById(R.id.nav_view)
+    }
+
     private fun setupDrawer() {
-        // Открытие по кнопке
         menuButton.setOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
         }
 
-        // Обработка пунктов меню
         navView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.nav_settings -> { /* Сделать обработку */ }
+                R.id.nav_settings -> {
+                    // Переход в SettingsActivity
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    return@setNavigationItemSelectedListener true
+                }
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
-
-        // Слушаем состояние Drawer
-        drawerLayout.addDrawerListener(object : DrawerLayout.DrawerListener {
-            override fun onDrawerOpened(drawerView: View) {
-                // Можно подсветить выбранный пункт
-            }
-            override fun onDrawerClosed(drawerView: View) {}
-            override fun onDrawerSlide(drawerView: View, slideOffset: Float) {}
-            override fun onDrawerStateChanged(newState: Int) {}
-        })
     }
 
     private fun setupSearch() {
@@ -88,5 +90,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
         onBackPressedDispatcher.addCallback(this, callback)
+    }
+
+    // --- ФУНКЦИИ ДЛЯ ТЕМЫ (оставлены, но используются только при запуске) ---
+    private fun getSavedTheme(): Int {
+        return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+    }
+
+    private fun applySavedTheme() {
+        AppCompatDelegate.setDefaultNightMode(getSavedTheme())
     }
 }

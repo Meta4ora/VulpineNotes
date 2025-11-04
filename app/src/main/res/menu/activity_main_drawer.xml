@@ -6,9 +6,11 @@
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/nav_account"
+            android:textColor="?attr/colorOnPrimary"
             android:title="Аккаунт" />
         <item
             android:id="@+id/nav_cloud"
+            android:textColor="?attr/colorOnPrimary"
             android:title="Облако" />
     </group>
 
@@ -16,12 +18,15 @@
         <menu>
             <item
                 android:id="@+id/nav_settings"
+                android:textColor="?attr/colorOnPrimary"
                 android:title="Настройки" />
             <item
                 android:id="@+id/nav_invite_friends"
+                android:textColor="?attr/colorOnPrimary"
                 android:title="Пригласить друзей" />
             <item
                 android:id="@+id/nav_support"
+                android:textColor="?attr/colorOnPrimary"
                 android:title="Помощь" />
         </menu>
     </item>
