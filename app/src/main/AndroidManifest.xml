@@ -12,6 +12,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VulpineNotes">
         <activity
+            android:name=".SettingsActivity"
+            android:parentActivityName=".MainActivity"
+            android:label="Настройки"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

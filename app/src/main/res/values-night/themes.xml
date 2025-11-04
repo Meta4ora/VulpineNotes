@@ -1,7 +1,20 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.VulpineNotes" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+    <style name="Theme.VulpineNotes" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- В тёмной теме: оранжевый → серый -->
+        <item name="colorPrimary">#616161</item> <!-- Серый, светлее фона -->
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#424242</item>
+        <item name="colorOnPrimaryContainer">#FFFFFF</item>
+
+        <!-- Фон -->
+        <item name="colorSurface">#121212</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="colorOnSurfaceVariant">#BBBBBB</item>
+
+        <!-- Фон и статус-бар -->
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>
