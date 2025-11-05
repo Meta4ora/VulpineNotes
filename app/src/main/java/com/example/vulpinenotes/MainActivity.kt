@@ -25,7 +25,9 @@ class MainActivity : AppCompatActivity() {
 
     private val PREFS_NAME = "theme_prefs"
     private val KEY_THEME = "app_theme"
-
+    companion object {
+        private const val REQUEST_SETTINGS = 1001
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         applySavedTheme()
         super.onCreate(savedInstanceState)
@@ -35,6 +37,7 @@ class MainActivity : AppCompatActivity() {
         setupDrawer()
         setupSearch()
         setupBackPress()
+
     }
 
     private fun initViews() {
@@ -53,14 +56,20 @@ class MainActivity : AppCompatActivity() {
         navView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_settings -> {
-                    // Переход в SettingsActivity
-                    startActivity(Intent(this, SettingsActivity::class.java))
+                    startActivityForResult(Intent(this, SettingsActivity::class.java), REQUEST_SETTINGS)
                     drawerLayout.closeDrawer(GravityCompat.START)
                     return@setNavigationItemSelectedListener true
                 }
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_SETTINGS) {
+            recreate() // Ключевое: пересоздаём активность
         }
     }
 

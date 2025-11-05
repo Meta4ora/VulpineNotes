@@ -2,10 +2,13 @@ package com.example.vulpinenotes
 
 import android.content.Context
 import android.os.Bundle
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import com.google.android.material.button.MaterialButtonToggleGroup
 import androidx.appcompat.widget.Toolbar
+import com.google.android.material.button.MaterialButtonToggleGroup
+
 class SettingsActivity : AppCompatActivity() {
 
     private val PREFS_NAME = "theme_prefs"
@@ -29,13 +32,14 @@ class SettingsActivity : AppCompatActivity() {
     private fun setupThemeSwitcher() {
         val themeToggleGroup = findViewById<MaterialButtonToggleGroup>(R.id.theme_toggle_group)
 
-        // Установить текущую тему
+        // Установить текущую выбранную кнопку
         when (getSavedTheme()) {
             AppCompatDelegate.MODE_NIGHT_NO -> themeToggleGroup.check(R.id.btn_light)
             AppCompatDelegate.MODE_NIGHT_YES -> themeToggleGroup.check(R.id.btn_dark)
             else -> themeToggleGroup.check(R.id.btn_system)
         }
 
+        // Единственный слушатель — без дубликатов
         themeToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 val mode = when (checkedId) {
@@ -45,6 +49,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 saveTheme(mode)
                 AppCompatDelegate.setDefaultNightMode(mode)
+                setResult(RESULT_OK) // Сообщаем MainActivity, что тема изменилась
             }
         }
     }
@@ -66,6 +71,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     override fun onSupportNavigateUp(): Boolean {
+        setResult(RESULT_OK) // На случай, если вышли через стрелку
         finish()
         return true
     }
