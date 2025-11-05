@@ -17,7 +17,7 @@
     <style name="Theme.VulpineNotes" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Основные цвета -->
         <item name="colorPrimary">#FF9800</item> <!-- Оранжевый -->
-        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorOnPrimary">#000000</item>
         <item name="colorPrimaryContainer">#FFB74D</item>
         <item name="colorOnPrimaryContainer">#000000</item>
 
