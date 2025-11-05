@@ -6,4 +6,5 @@
     <color name="orange_700">#F57C00</color>
     <color name="gray_200">#EEEEEE</color>
     <color name="gray_800">#333333</color>
+    <color name="splash_bg">#FF954D</color>
 </resources>
