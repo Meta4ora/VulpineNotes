@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:background="@color/splash_bg">
 
-    <!-- Лого (будет анимировано через Splash API) -->
     <ImageView
         android:id="@+id/splash_logo"
         android:layout_width="120dp"
@@ -18,7 +17,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginBottom="32dp" />
 
-    <!-- Текст -->
     <TextView
         android:id="@+id/splash_text"
         android:layout_width="wrap_content"

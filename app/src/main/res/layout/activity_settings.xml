@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
 
-    <!-- AppBar -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appbar"
         android:layout_width="match_parent"
@@ -24,7 +23,6 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Content -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -90,6 +88,43 @@
                 app:strokeColor="?attr/colorPrimary" />
 
         </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/language_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Выбор языка"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="12dp"
+            android:textColor="?attr/colorOnBackground" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/language_spinner_layout"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/select_language"
+            app:startIconDrawable="@drawable/ic_language"
+            app:startIconTint="?attr/colorPrimary"
+            app:boxCornerRadiusTopStart="24dp"
+            app:boxCornerRadiusTopEnd="24dp"
+            app:boxCornerRadiusBottomStart="24dp"
+            app:boxCornerRadiusBottomEnd="24dp"
+            app:strokeColor="?attr/colorPrimary"
+            app:boxBackgroundMode="outline">
+
+            <AutoCompleteTextView
+                android:id="@+id/language_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:completionThreshold="0" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
     </LinearLayout>
 

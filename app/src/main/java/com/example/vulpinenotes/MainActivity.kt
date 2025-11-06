@@ -23,7 +23,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var menuButton: ImageView
     private lateinit var navView: NavigationView
 
-    private val PREFS_NAME = "theme_prefs"
+    private val PREFS_NAME = "app_prefs"
     private val KEY_THEME = "app_theme"
     companion object {
         private const val REQUEST_SETTINGS = 1001
@@ -68,8 +68,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_SETTINGS) {
-            recreate() // Ключевое: пересоздаём активность
+        if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK) {
+            if (data?.getBooleanExtra("lang_changed", false) == true) {
+                recreate() // язык меняли — пересоздадимся
+            }
+            // Тему трогать не нужно: уже применена глобально
         }
     }
 
@@ -108,6 +111,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applySavedTheme() {
-        AppCompatDelegate.setDefaultNightMode(getSavedTheme())
+        val mode = getSavedTheme()
+        if (AppCompatDelegate.getDefaultNightMode() != mode) {
+            AppCompatDelegate.setDefaultNightMode(mode)
+        }
     }
 }
