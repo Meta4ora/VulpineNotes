@@ -7,16 +7,22 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
+import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.material.textfield.TextInputEditText
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var addBookButton: ImageButton
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var searchEditText: EditText
     private lateinit var clearButton: ImageView
@@ -37,7 +43,7 @@ class MainActivity : AppCompatActivity() {
         setupDrawer()
         setupSearch()
         setupBackPress()
-
+        showDialogAddBook()
     }
 
     private fun initViews() {
@@ -46,6 +52,7 @@ class MainActivity : AppCompatActivity() {
         searchEditText = findViewById(R.id.search_edit_text)
         clearButton = findViewById(R.id.clear_button)
         navView = findViewById(R.id.nav_view)
+        addBookButton = findViewById(R.id.add_button)
     }
 
     private fun setupDrawer() {
@@ -63,6 +70,58 @@ class MainActivity : AppCompatActivity() {
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
+        }
+    }
+
+    private fun showCustomDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.add_book_dialog, null)
+
+        val switchOption = dialogView.findViewById<SwitchMaterial>(R.id.switchOption)
+        val editText1 = dialogView.findViewById<TextInputEditText>(R.id.editText1)
+        val editText2 = dialogView.findViewById<TextInputEditText>(R.id.editText2)
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle("Настройки")
+            .setView(dialogView)
+            .setPositiveButton("Сохранить") { dialogInterface, which ->
+                // Действия при нажатии "Сохранить"
+                val isSwitchChecked = switchOption.isChecked
+                val text1 = editText1.text.toString()
+                val text2 = editText2.text.toString()
+
+                // Обработка данных
+                handleDialogResults(isSwitchChecked, text1, text2)
+            }
+            .setNegativeButton("Отмена") { dialogInterface, which ->
+                // Действия при нажатии "Отмена"
+                dialogInterface.dismiss()
+            }
+            .setNeutralButton("Сброс") { dialogInterface, which ->
+                // Действия при нажатии "Сброс"
+                switchOption.isChecked = false
+                editText1.setText("")
+                editText2.setText("")
+            }
+            .create()
+
+        dialog.show()
+    }
+
+    private fun handleDialogResults(
+        isSwitchChecked: Boolean,
+        text1: String,
+        text2: String
+    ) {
+        // Обработка результатов
+        val message = "Switch: $isSwitchChecked\nПоле 1: $text1\nПоле 2: $text2"
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+
+        // Здесь можно сохранить данные или выполнить другие действия
+    }
+
+    private fun showDialogAddBook() {
+        addBookButton.setOnClickListener {
+            showCustomDialog()
         }
     }
 
@@ -116,4 +175,5 @@ class MainActivity : AppCompatActivity() {
             AppCompatDelegate.setDefaultNightMode(mode)
         }
     }
+
 }

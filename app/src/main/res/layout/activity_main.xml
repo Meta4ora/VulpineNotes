@@ -59,7 +59,7 @@
                         android:id="@+id/search_edit_text"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
-                        android:hint="Поиск"
+                        android:hint="@string/search_bar"
                         android:paddingStart="16dp"
                         android:paddingEnd="40dp"
                         android:drawableStart="@drawable/ic_search"

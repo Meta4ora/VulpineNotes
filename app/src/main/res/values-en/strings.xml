@@ -3,4 +3,10 @@
     <string name="app_name">Vulpine Notes</string>
     <string name="select_language">Select language</string>
     <string name="settings_title">Options</string>
+    <string name="search_bar">Search</string>
+    <string name="language_select">Language</string>
+    <string name="dark_button">Dark</string>
+    <string name="system_button">System</string>
+    <string name="light_button">Light</string>
+    <string name="theme_text">Theme</string>
 </resources>
