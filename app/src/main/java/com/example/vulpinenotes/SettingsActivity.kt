@@ -1,15 +1,14 @@
 package com.example.vulpinenotes
 
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.widget.AutoCompleteTextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.button.MaterialButtonToggleGroup
 
-class SettingsActivity : AppCompatActivity() {
+class SettingsActivity : BaseActivity() {
 
     private val PREFS_NAME = "app_prefs"
     private val KEY_LANGUAGE = "app_language"
@@ -18,33 +17,41 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var languageSpinner: AutoCompleteTextView
     private lateinit var languages: List<Language>
 
+    private var isApplyingThemeFromState = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        applySavedLanguage()
-        applySavedTheme()
         super.onCreate(savedInstanceState)
+        applySavedTheme()
         setContentView(R.layout.activity_settings)
 
         setupToolbar()
         setupThemeSwitcher()
         setupLanguageSpinner()
-
-        // ГАРАНТИРОВАННО закрываем dropdown и снимаем фокус после recreate()
-        languageSpinner.dismissDropDown()
-        languageSpinner.clearFocus()
+        setupBackPressHandler()
     }
 
-    private var isApplyingThemeFromState = false
+    private fun setupBackPressHandler() {
+        // Это обрабатывает свайп назад и системную кнопку назад
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                if (prefs.getBoolean("lang_changed", false)) {
+                    setResult(RESULT_OK)
+                }
+                finish()
+            }
+        })
+    }
 
     private fun setupThemeSwitcher() {
         val themeToggleGroup = findViewById<MaterialButtonToggleGroup>(R.id.theme_toggle_group)
-
         themeToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked || isApplyingThemeFromState) return@addOnButtonCheckedListener
 
             val mode = when (checkedId) {
                 R.id.btn_light -> AppCompatDelegate.MODE_NIGHT_NO
-                R.id.btn_dark  -> AppCompatDelegate.MODE_NIGHT_YES
-                else           -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                R.id.btn_dark -> AppCompatDelegate.MODE_NIGHT_YES
+                else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
 
             if (AppCompatDelegate.getDefaultNightMode() == mode && getSavedTheme() == mode) return@addOnButtonCheckedListener
@@ -54,7 +61,6 @@ class SettingsActivity : AppCompatActivity() {
             setResult(RESULT_OK)
         }
 
-        // Устанавливаем сохранённую тему без вызова слушателя
         val savedMode = getSavedTheme()
         val checkedId = when (savedMode) {
             AppCompatDelegate.MODE_NIGHT_NO -> R.id.btn_light
@@ -69,7 +75,6 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun setupLanguageSpinner() {
         languageSpinner = findViewById(R.id.language_spinner)
-
         languages = listOf(
             Language("ru", "Русский", R.drawable.ic_ru_flag),
             Language("en", "English", R.drawable.ic_us_flag)
@@ -84,28 +89,18 @@ class SettingsActivity : AppCompatActivity() {
 
         languageSpinner.setOnItemClickListener { _, _, position, _ ->
             val selected = languages[position]
-
             if (getSavedLanguage() != selected.code) {
                 saveLanguage(selected.code)
-
-                // СОХРАНЯЕМ ФЛАГ: язык изменён
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("lang_changed", true)
                     .apply()
-
-                // Закрываем dropdown
-                languageSpinner.dismissDropDown()
-                languageSpinner.clearFocus()
-
-                recreate() // Обновляем SettingsActivity
-            } else {
-                languageSpinner.setText(selected.name, false)
+                setResult(RESULT_OK)
+                recreate()
             }
         }
     }
 
-    // === ЯЗЫК ===
     private fun saveLanguage(code: String) {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -118,16 +113,6 @@ class SettingsActivity : AppCompatActivity() {
             .getString(KEY_LANGUAGE, "ru") ?: "ru"
     }
 
-    private fun applySavedLanguage() {
-        val lang = getSavedLanguage()
-        val locale = java.util.Locale(lang)
-        java.util.Locale.setDefault(locale)
-        val config = resources.configuration
-        config.setLocale(locale)
-        resources.updateConfiguration(config, resources.displayMetrics)
-    }
-
-    // === ТЕМА ===
     private fun saveTheme(mode: Int) {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -147,17 +132,18 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    // === TOOLBAR ===
     private fun setupToolbar() {
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = getString(R.string.settings_title)
-    }
 
-    override fun onSupportNavigateUp(): Boolean {
-        setResult(RESULT_OK)
-        finish()
-        return true
+        toolbar.setNavigationOnClickListener {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.getBoolean("lang_changed", false)) {
+                setResult(RESULT_OK)
+            }
+            finish()
+        }
     }
 }

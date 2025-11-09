@@ -28,13 +28,15 @@
     <string name="reset">Сброс</string>
     <string name="no_title">Без названия</string>
     <string name="no_desc">Без описания</string>
-    <string name="unknown_author">Неизвестный автор</string>
+    <string name="unknown_desc">Нету описания</string>
     <string name="book_added">Книга добавлена!</string>
     <string name="fill_at_least_one_field">Заполните хотя бы одно поле</string>
 
     <!-- Информация о книге -->
     <string name="info">Информация</string>
     <string name="book_cover">Обложка книги</string>
+    <string name="edit">Изменить</string>
+    <string name="book_updated">Книга обновлена</string>
 
     <!-- Другое -->
     <string name="menu">Меню</string>

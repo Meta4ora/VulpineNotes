@@ -1,11 +1,11 @@
 package com.example.vulpinenotes
-// Book.kt
+
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
-data class Book(
+data class Chapter(
     val title: String,
-    val desc: String,
-    val coverUri: String? = null
+    val date: String,
+    val wordCount: Int
 ) : Parcelable

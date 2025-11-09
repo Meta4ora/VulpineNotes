@@ -7,15 +7,10 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -23,13 +18,10 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
-import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
-import android.widget.TextView
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : BaseActivity() {
 
-    // Views
     private lateinit var booksRecyclerView: RecyclerView
     private lateinit var bookAdapter: BookAdapter
     private val books = mutableListOf<Book>()
@@ -40,35 +32,34 @@ class MainActivity : AppCompatActivity() {
     private lateinit var menuButton: ImageView
     private lateinit var navView: NavigationView
 
-    // Dialog state
+    // Текущие элементы диалога
+    private var currentCoverPreview: ImageView? = null
+    private var currentBtnAddCover: Button? = null
     private var selectedImageUri: Uri? = null
-    private var coverPreview: ImageView? = null
-    private var btnAddCover: Button? = null
 
-    // Image picker
     private lateinit var pickImageLauncher: ActivityResultLauncher<String>
 
-    // SharedPreferences
     private val PREFS_NAME = "app_prefs"
     private val KEY_THEME = "app_theme"
-    private val KEY_LANGUAGE = "app_language"
+
     companion object {
         private const val REQUEST_SETTINGS = 1001
+        const val EXTRA_BOOK = "com.example.vulpinenotes.EXTRA_BOOK"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        applySavedLanguage()
-        applySavedTheme()
         super.onCreate(savedInstanceState)
+
+        applySavedTheme()
         setContentView(R.layout.activity_main)
 
-        // Регистрируем launcher ДО onStart()
+        // Один launcher на всё приложение
         pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let {
                 selectedImageUri = it
-                coverPreview?.setImageURI(it)
-                coverPreview?.visibility = View.VISIBLE
-                btnAddCover?.text = getString(R.string.change_cover)
+                currentCoverPreview?.setImageURI(it)
+                currentCoverPreview?.visibility = View.VISIBLE
+                currentBtnAddCover?.text = getString(R.string.change_cover)
             }
         }
 
@@ -90,6 +81,14 @@ class MainActivity : AppCompatActivity() {
         booksRecyclerView = findViewById(R.id.books_recycler_view)
     }
 
+    private fun startBookActivity(book: Book) {
+        // Убедитесь, что класс Book реализует Parcelable, чтобы его можно было передать
+        val intent = Intent(this, BookActivity::class.java).apply {
+            putExtra(EXTRA_BOOK, book)
+        }
+        startActivity(intent)
+    }
+
     private fun setupDrawer() {
         menuButton.setOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
@@ -108,15 +107,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupRecyclerView() {
+        bookAdapter = BookAdapter(
+            books,
+            this,
+            onShowInfo = { book -> showBookInfo(book) },
+            onEditBook = { book, position -> showEditDialog(book, position) },
+            // Реализация клика: запуск BookActivity
+            onBookClick = { book -> startBookActivity(book) }
+        )
+        booksRecyclerView.adapter = bookAdapter
+        booksRecyclerView.layoutManager = GridLayoutManager(this, 2)
+
+        books.add(Book("Зов Ктулху", "Г. Ф. Лавкрафт"))
+        bookAdapter.notifyDataSetChanged()
+    }
+
     private fun showBookInfo(book: Book) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_book_info, null)
-
         val cover = dialogView.findViewById<ImageView>(R.id.dialogCover)
         val title = dialogView.findViewById<TextView>(R.id.dialogTitle)
         val author = dialogView.findViewById<TextView>(R.id.dialogAuthor)
 
         title.text = book.title
-        author.text = book.desc
+        author.text = book.desc.ifBlank { getString(R.string.unknown_desc) }
 
         if (book.coverUri != null) {
             cover.setImageURI(Uri.parse(book.coverUri))
@@ -125,58 +139,45 @@ class MainActivity : AppCompatActivity() {
             cover.visibility = View.GONE
         }
 
-        MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this, R.style.CustomAlertDialogTheme)
             .setTitle(R.string.info)
             .setView(dialogView)
             .setPositiveButton("OK") { d, _ -> d.dismiss() }
             .show()
     }
 
-    private fun setupRecyclerView() {
-        bookAdapter = BookAdapter(books, this) { book ->
-            showBookInfo(book)
-        }
-        booksRecyclerView.adapter = bookAdapter
-        booksRecyclerView.layoutManager = GridLayoutManager(this, 2)
-
-        // Тестовая книга
-        books.add(Book("Зов Ктулху", "Г. Ф. Лавкрафт"))
-        bookAdapter.notifyDataSetChanged()
-    }
-
-    private fun showCustomDialog() {
+    // === ДИАЛОГ ДОБАВЛЕНИЯ ===
+    private fun showAddDialog() {
         val dialogView = layoutInflater.inflate(R.layout.add_book_dialog, null)
 
-        val switchOption = dialogView.findViewById<SwitchMaterial>(R.id.switchOption)
-        val editText1 = dialogView.findViewById<TextInputEditText>(R.id.editText1)
-        val editText2 = dialogView.findViewById<TextInputEditText>(R.id.editText2)
-        coverPreview = dialogView.findViewById(R.id.coverPreview)
-        btnAddCover = dialogView.findViewById(R.id.btnAddCover)
+        val editTitle = dialogView.findViewById<TextInputEditText>(R.id.editText1)
+        val editDesc = dialogView.findViewById<TextInputEditText>(R.id.editText2)
+        currentCoverPreview = dialogView.findViewById(R.id.coverPreview)
+        currentBtnAddCover = dialogView.findViewById(R.id.btnAddCover)
 
-        // Сброс состояния
         selectedImageUri = null
-        coverPreview?.visibility = View.GONE
-        btnAddCover?.text = getString(R.string.add_cover)
+        currentCoverPreview?.visibility = View.GONE
+        currentBtnAddCover?.text = getString(R.string.add_cover)
 
-        btnAddCover?.setOnClickListener {
+        currentBtnAddCover?.setOnClickListener {
             pickImageLauncher.launch("image/*")
         }
 
-        val dialog = MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.add_book)
             .setView(dialogView)
             .setPositiveButton(R.string.save) { _, _ ->
-                val title = editText1.text.toString().trim()
-                val author = editText2.text.toString().trim()
+                val title = editTitle.text.toString().trim()
+                val desc = editDesc.text.toString().trim()
 
-                if (title.isBlank() && author.isBlank()) {
+                if (title.isBlank() && desc.isBlank()) {
                     Toast.makeText(this, R.string.fill_at_least_one_field, Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
 
                 val newBook = Book(
                     title = title.ifBlank { getString(R.string.no_title) },
-                    desc = author.ifBlank { getString(R.string.unknown_author) },
+                    desc = desc.ifBlank { getString(R.string.unknown_desc) },
                     coverUri = selectedImageUri?.toString()
                 )
                 bookAdapter.addBook(newBook)
@@ -184,35 +185,87 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
             .setNeutralButton(R.string.reset) { _, _ ->
-                switchOption.isChecked = false
-                editText1.text?.clear()
-                editText2.text?.clear()
-                coverPreview?.visibility = View.GONE
-                btnAddCover?.text = getString(R.string.add_cover)
+                editTitle.text?.clear()
+                editDesc.text?.clear()
+                currentCoverPreview?.visibility = View.GONE
+                currentBtnAddCover?.text = getString(R.string.add_cover)
                 selectedImageUri = null
             }
-            .create()
+            .show()
+    }
 
-        dialog.show()
+    // === ДИАЛОГ РЕДАКТИРОВАНИЯ ===
+    private fun showEditDialog(book: Book, position: Int) {
+        val dialogView = layoutInflater.inflate(R.layout.edit_book_dialog, null)
+
+        val editTitle = dialogView.findViewById<TextInputEditText>(R.id.editText1)
+        val editDesc = dialogView.findViewById<TextInputEditText>(R.id.editText2)
+        currentCoverPreview = dialogView.findViewById(R.id.coverPreview)
+        currentBtnAddCover = dialogView.findViewById(R.id.btnAddCover)
+
+        // Заполняем
+        editTitle.setText(book.title)
+        editDesc.setText(book.desc)
+        selectedImageUri = book.coverUri?.let { Uri.parse(it) }
+
+        if (selectedImageUri != null) {
+            currentCoverPreview?.setImageURI(selectedImageUri)
+            currentCoverPreview?.visibility = View.VISIBLE
+            currentBtnAddCover?.text = getString(R.string.change_cover)
+        } else {
+            currentCoverPreview?.visibility = View.GONE
+            currentBtnAddCover?.text = getString(R.string.change_cover)
+        }
+
+        currentBtnAddCover?.setOnClickListener {
+            pickImageLauncher.launch("image/*")
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.edit)
+            .setView(dialogView)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val title = editTitle.text.toString().trim()
+                val desc = editDesc.text.toString().trim()
+
+                if (title.isBlank() && desc.isBlank()) {
+                    Toast.makeText(this, R.string.fill_at_least_one_field, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                val updatedBook = Book(
+                    title = title.ifBlank { getString(R.string.no_title) },
+                    desc = desc.ifBlank { getString(R.string.unknown_desc) },
+                    coverUri = selectedImageUri?.toString()
+                )
+                bookAdapter.updateBook(position, updatedBook)
+                Toast.makeText(this, R.string.book_updated, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .setNeutralButton(R.string.reset) { _, _ ->
+                editTitle.setText(book.title)
+                editDesc.setText(book.desc)
+                selectedImageUri = book.coverUri?.let { Uri.parse(it) }
+                if (selectedImageUri != null) {
+                    currentCoverPreview?.setImageURI(selectedImageUri)
+                    currentCoverPreview?.visibility = View.VISIBLE
+                } else {
+                    currentCoverPreview?.visibility = View.GONE
+                }
+            }
+            .show()
     }
 
     private fun showDialogAddBook() {
-        addBookButton.setOnClickListener {
-            showCustomDialog()
-        }
+        addBookButton.setOnClickListener { showAddDialog() }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK) {
-            val langChanged = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getBoolean("lang_changed", false)
-
-            if (langChanged) {
-                getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .edit()
-                    .remove("lang_changed")
-                    .apply()
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.getBoolean("lang_changed", false)) {
+                prefs.edit().remove("lang_changed").apply()
                 recreate()
             }
         }
@@ -246,26 +299,11 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, callback)
     }
 
-    // --- ТЕМА И ЯЗЫК ---
-    private fun getSavedTheme(): Int {
-        return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-    }
-
     private fun applySavedTheme() {
-        val mode = getSavedTheme()
+        val mode = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         if (AppCompatDelegate.getDefaultNightMode() != mode) {
             AppCompatDelegate.setDefaultNightMode(mode)
         }
-    }
-
-    private fun applySavedLanguage() {
-        val lang = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            .getString("app_language", "ru") ?: "ru"
-        val locale = java.util.Locale(lang)
-        java.util.Locale.setDefault(locale)
-        val config = resources.configuration
-        config.setLocale(locale)
-        resources.updateConfiguration(config, resources.displayMetrics)
     }
 }

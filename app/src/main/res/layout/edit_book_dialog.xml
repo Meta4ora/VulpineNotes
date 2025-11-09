@@ -6,18 +6,6 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Switch -->
-    <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/switchOption"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/save_to_cloud"
-        android:layout_marginBottom="16dp"
-
-        app:thumbTint="@animator/switch_thumb_selector"
-        app:trackTint="@animator/switch_track_selector" />
-
-    <!-- Обложка -->
     <ImageView
         android:id="@+id/coverPreview"
         android:layout_width="120dp"
@@ -33,10 +21,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:text="@string/add_cover"
+        android:text="@string/change_cover"
         android:layout_marginBottom="16dp" />
 
-    <!-- Название -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/textInputLayout1"
         android:layout_width="match_parent"
@@ -49,10 +36,8 @@
             android:layout_height="wrap_content"
             android:hint="@string/title"
             android:inputType="text" />
-
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Автор -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/textInputLayout2"
         android:layout_width="match_parent"
@@ -66,7 +51,6 @@
             android:layout_height="wrap_content"
             android:hint="@string/desc"
             android:inputType="text" />
-
     </com.google.android.material.textfield.TextInputLayout>
 
 </LinearLayout>

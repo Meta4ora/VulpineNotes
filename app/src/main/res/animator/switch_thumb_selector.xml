@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="#FF9900" android:state_checked="true"/>   <!-- Вкл: белый -->
+    <item android:color="#9D6E20" android:state_checked="false"/>  <!-- Выкл: серый -->
+</selector>

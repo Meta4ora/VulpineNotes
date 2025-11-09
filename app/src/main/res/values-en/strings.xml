@@ -28,13 +28,15 @@
     <string name="reset">Reset</string>
     <string name="no_title">No title</string>
     <string name="no_desc">No description</string>
-    <string name="unknown_author">Unknown author</string>
+    <string name="unknown_desc">None</string>
     <string name="book_added">Book added!</string>
     <string name="fill_at_least_one_field">Fill at least one field</string>
 
     <!-- Book Info -->
     <string name="info">Information</string>
     <string name="book_cover">Book cover</string>
+    <string name="edit">Edit</string>
+    <string name="book_updated">Book updated</string>
 
     <!-- Other -->
     <string name="menu">Menu</string>

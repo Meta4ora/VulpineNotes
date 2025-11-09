@@ -21,10 +21,6 @@
                 android:textColor="?attr/colorOnPrimary"
                 android:title="Настройки" />
             <item
-                android:id="@+id/nav_invite_friends"
-                android:textColor="?attr/colorOnPrimary"
-                android:title="Пригласить друзей" />
-            <item
                 android:id="@+id/nav_support"
                 android:textColor="?attr/colorOnPrimary"
                 android:title="Помощь" />

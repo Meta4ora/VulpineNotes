@@ -1,4 +1,4 @@
-// BookAdapter.kt
+// BookAdapter.kt — без изменений
 package com.example.vulpinenotes
 
 import android.content.Context
@@ -10,16 +10,19 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class BookAdapter(
     private val books: MutableList<Book>,
     private val context: Context,
-    private val onShowInfo: (Book) -> Unit // Колбэк
+    private val onShowInfo: (Book) -> Unit,
+    private val onEditBook: (Book, Int) -> Unit,
+    // НОВЫЙ обработчик клика по книге
+    private val onBookClick: (Book) -> Unit
 ) : RecyclerView.Adapter<BookAdapter.BookViewHolder>() {
 
     class BookViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val title: TextView = itemView.findViewById(R.id.book_title)
+        val cover: ImageView = itemView.findViewById(R.id.book_cover)
         val menuButton: ImageView = itemView.findViewById(R.id.book_menu_button)
     }
 
@@ -33,28 +36,35 @@ class BookAdapter(
         val book = books[position]
         holder.title.text = book.title
 
-        // ДОБАВЬ ЭТО: отображение обложки
-        val coverImage = holder.itemView.findViewById<ImageView>(R.id.book_cover)
         if (book.coverUri != null) {
-            coverImage.setImageURI(Uri.parse(book.coverUri))
-            coverImage.visibility = View.VISIBLE
+            holder.cover.setImageURI(Uri.parse(book.coverUri))
         } else {
-            coverImage.setImageResource(R.drawable.book_cover_placeholder)
-            coverImage.visibility = View.VISIBLE
+            holder.cover.setImageResource(R.drawable.book_cover_placeholder)
+        }
+        holder.cover.visibility = View.VISIBLE
+
+        // Обработка клика по кнопке меню
+        holder.menuButton.setOnClickListener {
+            showContextMenu(it, book, position)
         }
 
-        holder.menuButton.setOnClickListener {
-            showContextMenu(it, book)
+        // НОВАЯ Обработка клика по всему элементу (кроме меню)
+        holder.itemView.setOnClickListener {
+            onBookClick(book)
         }
     }
 
-    private fun showContextMenu(view: View, book: Book) {
+    private fun showContextMenu(view: View, book: Book, position: Int) {
         val popup = PopupMenu(context, view)
         popup.menuInflater.inflate(R.menu.book_context_menu, popup.menu)
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_info -> {
-                    onShowInfo(book) // Вызываем колбэк
+                    onShowInfo(book)
+                    true
+                }
+                R.id.action_edit -> {
+                    onEditBook(book, position)
                     true
                 }
                 else -> false
@@ -68,5 +78,10 @@ class BookAdapter(
     fun addBook(book: Book) {
         books.add(book)
         notifyItemInserted(books.size - 1)
+    }
+
+    fun updateBook(position: Int, book: Book) {
+        books[position] = book
+        notifyItemChanged(position)
     }
 }
