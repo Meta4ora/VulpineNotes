@@ -13,7 +13,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private val PREFS_NAME = "app_prefs"
     private val KEY_LANGUAGE = "app_language"
-    private val KEY_THEME = "app_theme"  // Добавь ключ для темы!
+    private val KEY_THEME = "app_theme"
 
     private lateinit var languageSpinner: AutoCompleteTextView
     private lateinit var languages: List<Language>
@@ -27,13 +27,17 @@ class SettingsActivity : AppCompatActivity() {
         setupToolbar()
         setupThemeSwitcher()
         setupLanguageSpinner()
+
+        // ГАРАНТИРОВАННО закрываем dropdown и снимаем фокус после recreate()
+        languageSpinner.dismissDropDown()
+        languageSpinner.clearFocus()
     }
+
     private var isApplyingThemeFromState = false
 
     private fun setupThemeSwitcher() {
         val themeToggleGroup = findViewById<MaterialButtonToggleGroup>(R.id.theme_toggle_group)
 
-        // 1) Подписываемся на изменения СНАЧАЛА, но с учётом флага.
         themeToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked || isApplyingThemeFromState) return@addOnButtonCheckedListener
 
@@ -43,15 +47,14 @@ class SettingsActivity : AppCompatActivity() {
                 else           -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
 
-            // 2) Если режим уже такой — ничего не делаем (важно, чтобы не было лишних пересозданий).
             if (AppCompatDelegate.getDefaultNightMode() == mode && getSavedTheme() == mode) return@addOnButtonCheckedListener
 
             saveTheme(mode)
-            AppCompatDelegate.setDefaultNightMode(mode) // Это само пересоздаст активити при необходимости.
+            AppCompatDelegate.setDefaultNightMode(mode)
             setResult(RESULT_OK)
         }
 
-        // 3) Программно отмечаем текущую кнопку, не вызывая обработчик.
+        // Устанавливаем сохранённую тему без вызова слушателя
         val savedMode = getSavedTheme()
         val checkedId = when (savedMode) {
             AppCompatDelegate.MODE_NIGHT_NO -> R.id.btn_light
@@ -60,14 +63,10 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         isApplyingThemeFromState = true
-        if (themeToggleGroup.checkedButtonId != checkedId) {
-            themeToggleGroup.check(checkedId)
-        } else {
-            // Гарантируем, что состояние группы валидное (иногда бывает без выбранной).
-            themeToggleGroup.check(checkedId)
-        }
+        themeToggleGroup.check(checkedId)
         isApplyingThemeFromState = false
     }
+
     private fun setupLanguageSpinner() {
         languageSpinner = findViewById(R.id.language_spinner)
 
@@ -85,23 +84,28 @@ class SettingsActivity : AppCompatActivity() {
 
         languageSpinner.setOnItemClickListener { _, _, position, _ ->
             val selected = languages[position]
-            languageSpinner.setText(selected.name, false)
 
             if (getSavedLanguage() != selected.code) {
                 saveLanguage(selected.code)
-                setResult(RESULT_OK, Intent().putExtra("lang_changed", true))
-                recreate()
-            } else {
-                // Просто закрываем
-                languageSpinner.postDelayed({ languageSpinner.clearFocus() }, 50)
-            }
-        }
 
-        languageSpinner.setOnClickListener {
-            languageSpinner.showDropDown()
+                // СОХРАНЯЕМ ФЛАГ: язык изменён
+                getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("lang_changed", true)
+                    .apply()
+
+                // Закрываем dropdown
+                languageSpinner.dismissDropDown()
+                languageSpinner.clearFocus()
+
+                recreate() // Обновляем SettingsActivity
+            } else {
+                languageSpinner.setText(selected.name, false)
+            }
         }
     }
 
+    // === ЯЗЫК ===
     private fun saveLanguage(code: String) {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -123,14 +127,7 @@ class SettingsActivity : AppCompatActivity() {
         resources.updateConfiguration(config, resources.displayMetrics)
     }
 
-    private fun setupToolbar() {
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = getString(R.string.settings_title) // Лучше через strings.xml
-    }
-
-
+    // === ТЕМА ===
     private fun saveTheme(mode: Int) {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -148,6 +145,14 @@ class SettingsActivity : AppCompatActivity() {
         if (AppCompatDelegate.getDefaultNightMode() != mode) {
             AppCompatDelegate.setDefaultNightMode(mode)
         }
+    }
+
+    // === TOOLBAR ===
+    private fun setupToolbar() {
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.title = getString(R.string.settings_title)
     }
 
     override fun onSupportNavigateUp(): Boolean {

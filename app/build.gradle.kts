@@ -82,6 +82,7 @@ dependencies {
     // Рекомендуется обновить или использовать отдельно
     implementation("com.firebaseui:firebase-ui-database:8.0.2")
     implementation(libs.androidx.animation.core)
+    implementation(libs.androidx.material3)
 
     // Testing
     testImplementation(libs.junit)

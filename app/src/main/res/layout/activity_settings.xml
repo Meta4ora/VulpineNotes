@@ -122,7 +122,8 @@
                 android:inputType="none"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:completionThreshold="0" />
+                android:completionThreshold="0"
+                android:saveEnabled="false" />
 
         </com.google.android.material.textfield.TextInputLayout>
 

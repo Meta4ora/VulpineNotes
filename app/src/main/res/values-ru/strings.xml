@@ -1,12 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Vulpine Notes</string>
+
+    <!-- Настройки -->
     <string name="select_language">Выберите язык</string>
     <string name="settings_title">Настройки</string>
-    <string name="search_bar">Поиск</string>
     <string name="language_select">Язык</string>
+    <string name="theme_text">Тема</string>
     <string name="dark_button">Темная</string>
     <string name="system_button">Система</string>
     <string name="light_button">Светлая</string>
-    <string name="theme_text">Тема</string>
+
+    <!-- Главный экран -->
+    <string name="search_bar">Поиск</string>
+
+    <!-- Добавление книги -->
+    <string name="add_book">Добавить книгу</string>
+    <string name="save_to_cloud">Сохранить в облако</string>
+    <string name="add_cover">Добавить обложку</string>
+    <string name="change_cover">Изменить обложку</string>
+    <string name="enter_title">Введите название</string>
+    <string name="enter_desc">Введите описание</string>
+    <string name="title">Название</string>
+    <string name="desc">Описание</string>
+    <string name="save">Сохранить</string>
+    <string name="cancel">Отмена</string>
+    <string name="reset">Сброс</string>
+    <string name="no_title">Без названия</string>
+    <string name="no_desc">Без описания</string>
+    <string name="unknown_author">Неизвестный автор</string>
+    <string name="book_added">Книга добавлена!</string>
+    <string name="fill_at_least_one_field">Заполните хотя бы одно поле</string>
+
+    <!-- Информация о книге -->
+    <string name="info">Информация</string>
+    <string name="book_cover">Обложка книги</string>
+
+    <!-- Другое -->
+    <string name="menu">Меню</string>
 </resources>
