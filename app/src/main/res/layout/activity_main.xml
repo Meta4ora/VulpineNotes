@@ -16,7 +16,6 @@
         android:layout_height="match_parent"
         android:fitsSystemWindows="true">
 
-        <!-- Header -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/header_layout"
             android:layout_width="match_parent"
@@ -60,7 +59,7 @@
                         android:id="@+id/search_edit_text"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
-                        android:hint="Поиск"
+                        android:hint="@string/search_bar"
                         android:paddingStart="16dp"
                         android:paddingEnd="40dp"
                         android:drawableStart="@drawable/ic_search"
@@ -106,7 +105,6 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- Chip -->
         <com.google.android.material.chip.Chip
             android:id="@+id/filter_chip"
             android:layout_width="wrap_content"
@@ -123,7 +121,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/header_layout" />
 
-        <!-- RecyclerView -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/books_recycler_view"
             android:layout_width="0dp"
@@ -138,7 +135,6 @@
             app:spanCount="2"
             tools:listitem="@layout/item_book_grid" />
 
-        <!-- FAB -->
         <androidx.cardview.widget.CardView
             android:id="@+id/add_button_card"
             android:layout_width="60dp"
@@ -164,13 +160,13 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- NavigationView -->
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         app:headerLayout="@layout/nav_header_main"
-        app:menu="@menu/activity_main_drawer" />
+        app:menu="@menu/activity_main_drawer"
+        style="@style/AppTheme.NavigationView"/>
 
 </androidx.drawerlayout.widget.DrawerLayout>

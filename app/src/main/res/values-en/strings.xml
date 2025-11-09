@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vulpine Notes</string>
+
+    <!-- Settings -->
+    <string name="select_language">Select language</string>
+    <string name="settings_title">Settings</string>
+    <string name="language_select">Language</string>
+    <string name="theme_text">Theme</string>
+    <string name="dark_button">Dark</string>
+    <string name="system_button">System</string>
+    <string name="light_button">Light</string>
+
+    <!-- Main Screen -->
+    <string name="search_bar">Search</string>
+
+    <!-- Add Book -->
+    <string name="add_book">Add Book</string>
+    <string name="save_to_cloud">Save to cloud</string>
+    <string name="add_cover">Add cover</string>
+    <string name="change_cover">Change cover</string>
+    <string name="enter_title">Enter title</string>
+    <string name="enter_desc">Enter description</string>
+    <string name="title">Title</string>
+    <string name="desc">Description</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="reset">Reset</string>
+    <string name="no_title">No title</string>
+    <string name="no_desc">No description</string>
+    <string name="unknown_author">Unknown author</string>
+    <string name="book_added">Book added!</string>
+    <string name="fill_at_least_one_field">Fill at least one field</string>
+
+    <!-- Book Info -->
+    <string name="info">Information</string>
+    <string name="book_cover">Book cover</string>
+
+    <!-- Other -->
+    <string name="menu">Menu</string>
+</resources>

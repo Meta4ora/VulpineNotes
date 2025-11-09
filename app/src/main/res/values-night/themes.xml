@@ -1,4 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="AppTheme.NavigationView" parent="Widget.Design.NavigationView">
+        <item name="itemTextColor">?attr/colorOnPrimary</item>
+        <item name="itemIconTint">?attr/colorOnPrimary</item>
+    </style>
+
     <style name="Theme.VulpineNotes" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- В тёмной теме: оранжевый → серый -->
         <item name="colorPrimary">#616161</item> <!-- Серый, светлее фона -->

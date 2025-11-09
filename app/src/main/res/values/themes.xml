@@ -1,8 +1,23 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Тема для Splash Screen -->
+    <style name="Theme.VulpineNotes.Splash" parent="Theme.SplashScreen">
+        <!-- Адаптивная иконка -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+
+        <!-- Фон — твой цвет -->
+        <item name="windowSplashScreenBackground">@color/cardview_dark_background</item>
+
+        <!-- Длительность анимации (макс 1000 мс) -->
+        <item name="windowSplashScreenAnimationDuration">800</item>
+
+        <!-- Тема после сплеша -->
+        <item name="postSplashScreenTheme">@style/Theme.VulpineNotes</item>
+    </style>
+
     <style name="Theme.VulpineNotes" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Основные цвета -->
         <item name="colorPrimary">#FF9800</item> <!-- Оранжевый -->
-        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorOnPrimary">#000000</item>
         <item name="colorPrimaryContainer">#FFB74D</item>
         <item name="colorOnPrimaryContainer">#000000</item>
 
