@@ -37,7 +37,13 @@
     <string name="book_cover">Book cover</string>
     <string name="edit">Edit</string>
     <string name="book_updated">Book updated</string>
+    <string name="chapters_count">%d chapters</string>
+    <string name="delete">Delete</string>
 
     <!-- Other -->
     <string name="menu">Menu</string>
+    <string name="upload_to_cloud">Send to cloud</string>
+    <string name="confirm_upload">Are you sure to send book \"%s\" on cloud storage?</string>
+    <string name="upload_started">Sending to cloud...</string>
+    <string name="upload_cancelled">Sending canceled</string>
 </resources>

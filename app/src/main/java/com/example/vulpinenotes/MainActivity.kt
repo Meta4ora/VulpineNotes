@@ -96,14 +96,28 @@ class MainActivity : BaseActivity() {
 
         navView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
+                R.id.nav_account -> {
+                    startActivity(Intent(this, AccountActivity::class.java))
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    true
+                }
+                R.id.nav_cloud -> {
+                    startActivity(Intent(this, CloudActivity::class.java))
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    true
+                }
+                R.id.nav_support -> {
+                    startActivity(Intent(this, SupportActivity::class.java))
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    true
+                }
                 R.id.nav_settings -> {
                     startActivityForResult(Intent(this, SettingsActivity::class.java), REQUEST_SETTINGS)
                     drawerLayout.closeDrawer(GravityCompat.START)
-                    return@setNavigationItemSelectedListener true
+                    true
                 }
+                else -> false
             }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
         }
     }
 
@@ -113,13 +127,14 @@ class MainActivity : BaseActivity() {
             this,
             onShowInfo = { book -> showBookInfo(book) },
             onEditBook = { book, position -> showEditDialog(book, position) },
-            // Реализация клика: запуск BookActivity
             onBookClick = { book -> startBookActivity(book) }
         )
         booksRecyclerView.adapter = bookAdapter
         booksRecyclerView.layoutManager = GridLayoutManager(this, 2)
 
-        books.add(Book("Зов Ктулху", "Г. Ф. Лавкрафт"))
+        // Тестовые данные с главами
+        books.add(Book("Зов Ктулху", "Г. Ф. Лавкрафт", chaptersCount = 12))
+        books.add(Book("Дюна", "Фрэнк Герберт", chaptersCount = 48))
         bookAdapter.notifyDataSetChanged()
     }
 
@@ -178,7 +193,8 @@ class MainActivity : BaseActivity() {
                 val newBook = Book(
                     title = title.ifBlank { getString(R.string.no_title) },
                     desc = desc.ifBlank { getString(R.string.unknown_desc) },
-                    coverUri = selectedImageUri?.toString()
+                    coverUri = selectedImageUri?.toString(),
+                    chaptersCount = 0  // Новая книга — 0 глав
                 )
                 bookAdapter.addBook(newBook)
                 Toast.makeText(this, R.string.book_added, Toast.LENGTH_SHORT).show()
@@ -233,10 +249,12 @@ class MainActivity : BaseActivity() {
                     return@setPositiveButton
                 }
 
+                // В showEditDialog()
                 val updatedBook = Book(
                     title = title.ifBlank { getString(R.string.no_title) },
                     desc = desc.ifBlank { getString(R.string.unknown_desc) },
-                    coverUri = selectedImageUri?.toString()
+                    coverUri = selectedImageUri?.toString(),
+                    chaptersCount = book.chaptersCount  // Сохраняем текущее количество
                 )
                 bookAdapter.updateBook(position, updatedBook)
                 Toast.makeText(this, R.string.book_updated, Toast.LENGTH_SHORT).show()

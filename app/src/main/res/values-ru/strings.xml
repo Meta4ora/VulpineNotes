@@ -37,7 +37,13 @@
     <string name="book_cover">Обложка книги</string>
     <string name="edit">Изменить</string>
     <string name="book_updated">Книга обновлена</string>
+    <string name="chapters_count">%d глав</string>
+    <string name="delete">Удалить</string>
 
     <!-- Другое -->
     <string name="menu">Меню</string>
+    <string name="upload_to_cloud">Отправить в облако</string>
+    <string name="confirm_upload">Вы уверены, что хотите отправить книгу \"%s\" в облачное хранилище?</string>
+    <string name="upload_started">Отправка книги в облако...</string>
+    <string name="upload_cancelled">Отправка отменена</string>
 </resources>

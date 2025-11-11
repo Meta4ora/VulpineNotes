@@ -32,18 +32,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@id/user_avatar" />
 
-    <ImageView
-        android:id="@+id/edit_button"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:contentDescription="Редактировать профиль"
-        android:padding="8dp"
-        android:src="@drawable/ic_edit"
-        app:tint="?attr/colorOnPrimary"
-        app:layout_constraintBottom_toBottomOf="@id/user_avatar"
-        app:layout_constraintEnd_toStartOf="@+id/settings_toggle"
-        app:layout_constraintTop_toTopOf="@id/user_avatar" />
-
     <TextView
         android:id="@+id/username"
         android:layout_width="wrap_content"

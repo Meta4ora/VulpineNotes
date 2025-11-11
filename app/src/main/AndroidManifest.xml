@@ -12,6 +12,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VulpineNotes">
         <activity
+            android:name=".SupportActivity"
+            android:exported="false" />
+        <activity
+            android:name=".CloudActivity"
+            android:exported="false" />
+        <activity
+            android:name=".AccountActivity"
+            android:exported="false" />
+        <activity
             android:name=".BookActivity"
             android:exported="false" />
         <activity

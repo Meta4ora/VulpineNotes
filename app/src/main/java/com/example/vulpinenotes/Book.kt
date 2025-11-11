@@ -7,5 +7,6 @@ import kotlinx.parcelize.Parcelize
 data class Book(
     val title: String,
     val desc: String,
-    val coverUri: String? = null
+    val coverUri: String? = null,
+    val chaptersCount: Int = 0  // <-- новое поле
 ) : Parcelable

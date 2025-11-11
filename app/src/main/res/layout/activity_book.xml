@@ -18,7 +18,7 @@
         android:background="@android:color/transparent"
         app:elevation="0dp">
 
-        <!-- Закруглённый фон -->
+        <!-- Закруглённый фон для Toolbar -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -43,6 +43,26 @@
                 android:paddingEnd="16dp" />
 
         </androidx.cardview.widget.CardView>
+
+        <!-- Chip фильтрации ПОД Toolbar -->
+        <com.google.android.material.chip.Chip
+            android:id="@+id/filter_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="0dp"
+            android:text="Название"
+            android:textColor="?attr/colorOnPrimary"
+            app:chipBackgroundColor="?attr/colorPrimary"
+            app:chipCornerRadius="20dp"
+            app:chipIcon="@drawable/ic_filter"
+            app:chipIconTint="?attr/colorOnPrimary"
+            app:chipIconVisible="true"
+            android:clickable="true"
+            android:focusable="true"
+            app:layout_scrollFlags="scroll|enterAlways" />
+
     </com.google.android.material.appbar.AppBarLayout>
 
     <!-- RecyclerView -->
@@ -57,8 +77,7 @@
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         tools:listitem="@layout/item_chapter" />
 
-    <!-- Замените ВЕСЬ блок <ImageButton id="@+id/fab_add_chapter" ... /> на ЭТО: -->
-
+    <!-- FAB -->
     <androidx.cardview.widget.CardView
         android:id="@+id/fab_add_chapter_card"
         android:layout_width="60dp"

@@ -6,6 +6,8 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 data class Chapter(
     val title: String,
+    val description: String = "",
     val date: String,
-    val wordCount: Int
+    val wordCount: Int,
+    var isFavorite: Boolean = false
 ) : Parcelable
