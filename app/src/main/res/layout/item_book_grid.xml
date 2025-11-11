@@ -17,7 +17,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintDimensionRatio="3:5">
 
-        <!-- Обложка -->
         <ImageView
             android:id="@+id/book_cover"
             android:layout_width="match_parent"
@@ -26,7 +25,6 @@
             android:src="@drawable/book_cover_placeholder"
             android:contentDescription="Обложка книги" />
 
-        <!-- Тёмная полоса внизу -->
         <View
             android:id="@+id/bottom_overlay"
             android:layout_width="match_parent"
@@ -34,7 +32,6 @@
             android:layout_gravity="bottom"
             android:background="?attr/colorPrimary" />
 
-        <!-- Текст с количеством глав (слева внизу) -->
         <TextView
             android:id="@+id/chapters_count"
             android:layout_width="wrap_content"
@@ -48,9 +45,6 @@
             app:layout_constraintBottom_toBottomOf="@id/bottom_overlay"
             app:layout_constraintStart_toStartOf="parent" />
 
-        <!-- Кнопка «Сохранить в облако» (слева от трёх точек) -->
-
-        <!-- Кнопка меню (три точки) -->
         <ImageView
             android:id="@+id/book_menu_button"
             android:layout_width="48dp"
@@ -65,7 +59,6 @@
 
     </androidx.cardview.widget.CardView>
 
-    <!-- Название книги под карточкой -->
     <TextView
         android:id="@+id/book_title"
         android:layout_width="0dp"

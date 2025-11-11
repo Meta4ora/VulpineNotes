@@ -15,7 +15,6 @@ class LanguageAdapter(
     private val languages: List<Language>
 ) : ArrayAdapter<Language>(context, resource, languages) {
 
-    // Эталонный список — не меняется
     private val allLanguages = languages.toList()
 
     override fun getCount(): Int = allLanguages.size

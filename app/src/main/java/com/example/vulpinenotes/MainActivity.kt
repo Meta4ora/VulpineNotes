@@ -32,7 +32,6 @@ class MainActivity : BaseActivity() {
     private lateinit var menuButton: ImageView
     private lateinit var navView: NavigationView
 
-    // Текущие элементы диалога
     private var currentCoverPreview: ImageView? = null
     private var currentBtnAddCover: Button? = null
     private var selectedImageUri: Uri? = null
@@ -53,7 +52,6 @@ class MainActivity : BaseActivity() {
         applySavedTheme()
         setContentView(R.layout.activity_main)
 
-        // Один launcher на всё приложение
         pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let {
                 selectedImageUri = it
@@ -82,7 +80,6 @@ class MainActivity : BaseActivity() {
     }
 
     private fun startBookActivity(book: Book) {
-        // Убедитесь, что класс Book реализует Parcelable, чтобы его можно было передать
         val intent = Intent(this, BookActivity::class.java).apply {
             putExtra(EXTRA_BOOK, book)
         }
@@ -132,7 +129,6 @@ class MainActivity : BaseActivity() {
         booksRecyclerView.adapter = bookAdapter
         booksRecyclerView.layoutManager = GridLayoutManager(this, 2)
 
-        // Тестовые данные с главами
         books.add(Book("Зов Ктулху", "Г. Ф. Лавкрафт", chaptersCount = 12))
         books.add(Book("Дюна", "Фрэнк Герберт", chaptersCount = 48))
         bookAdapter.notifyDataSetChanged()
@@ -161,7 +157,6 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
-    // === ДИАЛОГ ДОБАВЛЕНИЯ ===
     private fun showAddDialog() {
         val dialogView = layoutInflater.inflate(R.layout.add_book_dialog, null)
 
@@ -210,7 +205,6 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
-    // === ДИАЛОГ РЕДАКТИРОВАНИЯ ===
     private fun showEditDialog(book: Book, position: Int) {
         val dialogView = layoutInflater.inflate(R.layout.edit_book_dialog, null)
 
@@ -219,7 +213,6 @@ class MainActivity : BaseActivity() {
         currentCoverPreview = dialogView.findViewById(R.id.coverPreview)
         currentBtnAddCover = dialogView.findViewById(R.id.btnAddCover)
 
-        // Заполняем
         editTitle.setText(book.title)
         editDesc.setText(book.desc)
         selectedImageUri = book.coverUri?.let { Uri.parse(it) }

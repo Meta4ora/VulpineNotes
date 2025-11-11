@@ -12,6 +12,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VulpineNotes">
         <activity
+            android:name=".ChapterEditActivity"
+            android:exported="false" />
+        <activity
             android:name=".SupportActivity"
             android:exported="false" />
         <activity

@@ -8,5 +8,5 @@ data class Book(
     val title: String,
     val desc: String,
     val coverUri: String? = null,
-    val chaptersCount: Int = 0  // <-- новое поле
+    val chaptersCount: Int = 0
 ) : Parcelable

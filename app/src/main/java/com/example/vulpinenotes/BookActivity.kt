@@ -1,6 +1,7 @@
 // BookActivity.kt
 package com.example.vulpinenotes
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.widget.ImageButton
@@ -14,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
+import androidx.activity.result.contract.ActivityResultContracts
 
 class BookActivity : AppCompatActivity() {
 
@@ -24,6 +26,24 @@ class BookActivity : AppCompatActivity() {
     private lateinit var chapterAdapter: ChapterAdapter
     private val chapters = mutableListOf<Chapter>()
     private lateinit var recyclerView: RecyclerView
+
+    private val editChapterLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == ChapterEditActivity.RESULT_UPDATED_CHAPTER) {
+            val updatedChapter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(ChapterEditActivity.EXTRA_CHAPTER, Chapter::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra(ChapterEditActivity.EXTRA_CHAPTER)
+            }
+            val pos = result.data?.getIntExtra(ChapterEditActivity.EXTRA_CHAPTER_POSITION, -1) ?: -1
+            if (updatedChapter != null && pos != -1) {
+                chapters[pos] = updatedChapter
+                chapterAdapter.notifyItemChanged(pos)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +70,6 @@ class BookActivity : AppCompatActivity() {
         book?.let { b ->
             supportActionBar?.title = b.title
 
-            // Тестовые главы
             chapters.addAll(listOf(
                 Chapter("Глава 1: Начало пути", "Первая встреча с героем", "03.11.25", 225, false),
                 Chapter("Глава 2: Тёмный лес", "Опасности и тайны", "04.11.25", 512, true),
@@ -61,15 +80,21 @@ class BookActivity : AppCompatActivity() {
             chapterAdapter = ChapterAdapter(
                 chapters,
                 this,
-                onInfo = { chapter -> showChapterInfo(chapter) },
+                onInfo = { showChapterInfo(it) },
                 onEdit = { chapter, pos -> showEditChapterDialog(chapter, pos) },
-                onDelete = { chapter -> chapterAdapter.removeChapter(chapter) },
-                onFavoriteToggle = { chapter -> toggleFavoriteWithAnimation(chapter) }
+                onDelete = { chapterAdapter.removeChapter(it) },
+                onFavoriteToggle = { toggleFavoriteWithAnimation(it) },
+                onChapterClick = { chapter, position ->
+                    val intent = Intent(this, ChapterEditActivity::class.java).apply {
+                        putExtra(ChapterEditActivity.EXTRA_CHAPTER, chapter)
+                        putExtra(ChapterEditActivity.EXTRA_CHAPTER_POSITION, position)
+                    }
+                    editChapterLauncher.launch(intent)
+                }
             )
 
             recyclerView.adapter = chapterAdapter
             recyclerView.layoutManager = LinearLayoutManager(this)
-
             setupDragAndDrop()
         } ?: finish()
 
@@ -124,7 +149,6 @@ class BookActivity : AppCompatActivity() {
         chapterAdapter.notifyItemChanged(index)
 
         if (updatedChapter.isFavorite && index != 0) {
-            // Перемещаем наверх с анимацией
             chapters.removeAt(index)
             chapters.add(0, updatedChapter)
             chapterAdapter.notifyItemMoved(index, 0)

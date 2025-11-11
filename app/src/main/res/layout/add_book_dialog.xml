@@ -6,7 +6,6 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Switch -->
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/switchOption"
         android:layout_width="match_parent"
@@ -17,7 +16,6 @@
         app:thumbTint="@animator/switch_thumb_selector"
         app:trackTint="@animator/switch_track_selector" />
 
-    <!-- Обложка -->
     <ImageView
         android:id="@+id/coverPreview"
         android:layout_width="120dp"
@@ -36,7 +34,6 @@
         android:text="@string/add_cover"
         android:layout_marginBottom="16dp" />
 
-    <!-- Название -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/textInputLayout1"
         android:layout_width="match_parent"
@@ -52,7 +49,6 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Автор -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/textInputLayout2"
         android:layout_width="match_parent"

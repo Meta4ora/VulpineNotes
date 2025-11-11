@@ -13,7 +13,6 @@ import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
-// BookAdapter.kt
 class BookAdapter(
     private val books: MutableList<Book>,
     private val context: Context,

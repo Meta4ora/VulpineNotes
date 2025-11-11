@@ -18,7 +18,6 @@
         android:padding="16dp"
         android:background="?attr/colorPrimaryContainer">
 
-        <!-- КНОПКА МЕНЮ — ПРАВЫЙ ВЕРХНИЙ УГОЛ, 48dp -->
         <ImageView
             android:id="@+id/menu_button"
             android:layout_width="48dp"
@@ -31,7 +30,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:contentDescription="Меню главы" />
 
-        <!-- ЗАКЛАДКА — СЛЕВА ОТ МЕНЮ, 32dp -->
         <ImageView
             android:id="@+id/bookmark_icon"
             android:layout_width="40dp"
@@ -45,7 +43,6 @@
             android:layout_marginEnd="8dp"
             android:contentDescription="Закладка" />
 
-        <!-- НАЗВАНИЕ ГЛАВЫ -->
         <TextView
             android:id="@+id/chapter_title"
             android:layout_width="0dp"
@@ -59,7 +56,6 @@
             app:layout_constraintEnd_toStartOf="@id/bookmark_icon"
             android:layout_marginEnd="8dp" />
 
-        <!-- ДАТА -->
         <TextView
             android:id="@+id/chapter_date"
             android:layout_width="wrap_content"
@@ -71,7 +67,6 @@
             app:layout_constraintStart_toStartOf="parent"
             android:layout_marginTop="4dp" />
 
-        <!-- КОЛИЧЕСТВО СЛОВ -->
         <TextView
             android:id="@+id/word_count"
             android:layout_width="wrap_content"

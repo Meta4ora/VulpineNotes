@@ -18,7 +18,8 @@ class ChapterAdapter(
     private val onInfo: (Chapter) -> Unit,
     private val onEdit: (Chapter, Int) -> Unit,
     private val onDelete: (Chapter) -> Unit,
-    private val onFavoriteToggle: (Chapter) -> Unit
+    private val onFavoriteToggle: (Chapter) -> Unit,
+    private val onChapterClick: (Chapter, Int) -> Unit  // ← Новый
 ) : RecyclerView.Adapter<ChapterAdapter.ChapterViewHolder>() {
 
     inner class ChapterViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -42,23 +43,23 @@ class ChapterAdapter(
         holder.date.text = chapter.date
         holder.wordCount.text = "${chapter.wordCount} слов"
 
-        // Закладка — одна иконка, tint
-        holder.bookmarkIcon.setImageResource(R.drawable.ic_bookmark)
+        // Закладка
         val tintColor = if (chapter.isFavorite) {
             ContextCompat.getColor(context, R.color.gold)
         } else {
             ContextCompat.getColor(context, R.color.outline)
         }
         holder.bookmarkIcon.imageTintList = ColorStateList.valueOf(tintColor)
-
-        // Клик по закладке — передаём chapter
-        holder.bookmarkIcon.setOnClickListener {
-            onFavoriteToggle(chapter)
-        }
+        holder.bookmarkIcon.setOnClickListener { onFavoriteToggle(chapter) }
 
         // Меню
         holder.menuButton.setOnClickListener { view ->
             showPopupMenu(view, chapter)
+        }
+
+        // Клик по всей карточке - редактор
+        holder.itemView.setOnClickListener {
+            onChapterClick(chapter, position)
         }
     }
 
