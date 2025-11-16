@@ -7,11 +7,11 @@
         <item
             android:id="@+id/nav_account"
             android:textColor="?attr/colorOnPrimary"
-            android:title="Аккаунт" />
+            android:title="@string/account" />
         <item
             android:id="@+id/nav_cloud"
             android:textColor="?attr/colorOnPrimary"
-            android:title="Облако" />
+            android:title="@string/cloud" />
     </group>
 
     <item
@@ -20,11 +20,11 @@
             <item
                 android:id="@+id/nav_settings"
                 android:textColor="?attr/colorOnPrimary"
-                android:title="Настройки" />
+                android:title="@string/options" />
             <item
                 android:id="@+id/nav_support"
                 android:textColor="?attr/colorOnPrimary"
-                android:title="Помощь" />
+                android:title="@string/help" />
         </menu>
     </item>
 </menu>

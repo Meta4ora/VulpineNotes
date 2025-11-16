@@ -1,4 +1,3 @@
-// BookAdapter.kt — без изменений
 package com.example.vulpinenotes
 
 import android.content.Context
@@ -12,6 +11,9 @@ import android.widget.Toast
 import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.bumptech.glide.Glide
 
 class BookAdapter(
     private val books: MutableList<Book>,
@@ -37,28 +39,25 @@ class BookAdapter(
     override fun onBindViewHolder(holder: BookViewHolder, position: Int) {
         val book = books[position]
 
-        // Обложка
-        if (book.coverUri != null) {
-            holder.cover.setImageURI(Uri.parse(book.coverUri))
+        // Используем Glide — безопасно загружает локальные и удалённые URI
+        if (!book.coverUri.isNullOrBlank()) {
+            try {
+                Glide.with(context)
+                    .load(book.coverUri)
+                    .placeholder(R.drawable.book_cover_placeholder)
+                    .into(holder.cover)
+            } catch (e: Exception) {
+                holder.cover.setImageResource(R.drawable.book_cover_placeholder)
+            }
         } else {
             holder.cover.setImageResource(R.drawable.book_cover_placeholder)
         }
 
-        // Название
         holder.title.text = book.title
-
-        // Количество глав
         holder.chaptersCount.text = context.getString(R.string.chapters_count, book.chaptersCount)
 
-        // Клик по карточке
-        holder.itemView.setOnClickListener {
-            onBookClick(book)
-        }
-
-        // Кнопка меню (три точки)
-        holder.menuButton.setOnClickListener { view ->
-            showPopupMenu(view, book, position)
-        }
+        holder.itemView.setOnClickListener { onBookClick(book) }
+        holder.menuButton.setOnClickListener { view -> showPopupMenu(view, book, position) }
     }
 
     private fun showPopupMenu(view: View, book: Book, position: Int) {
@@ -108,17 +107,30 @@ class BookAdapter(
             .setTitle("Удалить книгу?")
             .setMessage("Книга \"${book.title}\" будет удалена без возможности восстановления.")
             .setPositiveButton("Удалить") { _, _ ->
-                books.removeAt(position)
-                notifyItemRemoved(position)
-                notifyItemRangeChanged(position, books.size)
-                Toast.makeText(context, "Книга удалена", Toast.LENGTH_SHORT).show()
+                deleteBookFromFirestore(book, position)
             }
             .setNegativeButton("Отмена", null)
             .show()
     }
 
+    private fun deleteBookFromFirestore(book: Book, position: Int) {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val db = FirebaseFirestore.getInstance()
+
+        db.collection("users").document(user.uid).collection("books").document(book.id)
+            .delete()
+            .addOnSuccessListener {
+                // Удаление обработает listener в MainActivity; можно показать тост
+                Toast.makeText(context, "Книга удалена", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "Ошибка: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
     override fun getItemCount() = books.size
 
+    // Эти методы используются редко, но оставлены
     fun addBook(book: Book) {
         books.add(book)
         notifyItemInserted(books.size - 1)

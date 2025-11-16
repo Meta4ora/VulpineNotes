@@ -13,6 +13,11 @@
 
     <!-- Main Screen -->
     <string name="search_bar">Search</string>
+    <string name="options">Options</string>
+    <string name="cloud">Cloud</string>
+    <string name="account">Account</string>
+    <string name="help">Help</string>
+    <string name="addition">Secondary</string>
 
     <!-- Add Book -->
     <string name="add_book">Add Book</string>
@@ -46,4 +51,9 @@
     <string name="confirm_upload">Are you sure to send book \"%s\" on cloud storage?</string>
     <string name="upload_started">Sending to cloud...</string>
     <string name="upload_cancelled">Sending canceled</string>
+    <string name="export_cancelled">Export canceled</string>
+    <string name="export_confirm">Are you sure to export this book?</string>
+    <string name="export">Export</string>
+    <string name="export_started">Export book...</string>
+    <string name="default_web_client_id">59321474403-kst2avv2kub814kcpd6dgrbt846n9uvs.apps.googleusercontent.com</string>
 </resources>

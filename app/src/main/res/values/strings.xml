@@ -13,6 +13,12 @@
 
     <!-- Главный экран -->
     <string name="search_bar">Поиск</string>
+    <string name="options">Настройки</string>
+    <string name="cloud">Облако</string>
+    <string name="account">Аккаунт</string>
+    <string name="help">Помощь</string>
+    <string name="addition">Дополнительно</string>
+
 
     <!-- Добавление книги -->
     <string name="add_book">Добавить книгу</string>
@@ -46,4 +52,11 @@
     <string name="confirm_upload">Вы уверены, что хотите отправить книгу \"%s\" в облачное хранилище?</string>
     <string name="upload_started">Отправка книги в облако...</string>
     <string name="upload_cancelled">Отправка отменена</string>
+    <string name="export_cancelled">Экспорт отменен</string>
+    <string name="export_confirm">Вы уверены что хотите экспортировать книгу?</string>
+    <string name="export">Экспортировать</string>
+    <string name="export_started">Экспорт книги...</string>
+    <string name="default_web_client_id">59321474403-kst2avv2kub814kcpd6dgrbt846n9uvs.apps.googleusercontent.com</string>
+
+
 </resources>

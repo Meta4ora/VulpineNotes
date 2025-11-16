@@ -4,10 +4,8 @@
         <!-- Адаптивная иконка -->
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
 
-        <!-- Фон — твой цвет -->
         <item name="windowSplashScreenBackground">@color/cardview_dark_background</item>
 
-        <!-- Длительность анимации (макс 1000 мс) -->
         <item name="windowSplashScreenAnimationDuration">800</item>
 
         <!-- Тема после сплеша -->
@@ -52,7 +50,6 @@
     <style name="DialogButtonStyle" parent="Widget.Material3.Button.TextButton.Dialog">
         <!-- Цвет текста кнопок -->
         <item name="android:textColor">?attr/colorOnPrimary</item>
-        <!-- Можно добавить яркий фон -->
         <item name="android:backgroundTint">?attr/colorPrimary</item>
         <!-- Немного радиуса -->
         <item name="cornerRadius">12dp</item>

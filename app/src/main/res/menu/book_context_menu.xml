@@ -12,8 +12,12 @@
 
     <item
         android:id="@+id/action_upload"
-        android:title="Отправить в облако"
+        android:title="@string/upload_to_cloud"
         android:icon="@drawable/ic_cloud_upload" />
+    <item
+        android:id="@+id/action_export"
+        android:title="@string/export"
+        android:icon="@drawable/ic_bookmark" />
 
     <item
         android:id="@+id/action_delete"

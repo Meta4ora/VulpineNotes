@@ -47,9 +47,18 @@ android {
 }
 
 dependencies {
+    // Firebase BOM (управляет всеми версиями Firebase)
     implementation(platform("com.google.firebase:firebase-bom:34.5.0"))
-    implementation("com.google.firebase:firebase-analytics")
 
+    // Основные Firebase модули (без -ktx — KTX встроено)
+    implementation("com.google.firebase:firebase-analytics")  // Аналитика (без -ktx)
+    implementation("com.google.firebase:firebase-firestore")  // Firestore (основной модуль)
+    implementation("com.google.firebase:firebase-auth")       // Auth (основной)
+    implementation("com.google.firebase:firebase-storage")    // Storage (если нужно для обложек)
+
+    implementation("com.google.firebase:firebase-database")
+
+    // Остальные зависимости (не Firebase)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity)
@@ -66,15 +75,17 @@ dependencies {
 
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    implementation("com.google.firebase:firebase-database")
-    implementation("com.google.firebase:firebase-storage")
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.firebaseui:firebase-ui-database:8.0.2")
-
     implementation(libs.androidx.animation.core)
     implementation(libs.androidx.material3)
     implementation("androidx.core:core-splashscreen:1.0.1")
 
+    // Google Sign-In (не Firebase, остаётся)
+    implementation("com.google.android.gms:play-services-auth:21.1.0")
+
+    // Glide для аватарок
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    // Тесты
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
