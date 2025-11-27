@@ -2,8 +2,6 @@ package com.example.vulpinenotes
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -18,26 +16,30 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.example.vulpinenotes.data.AppDatabase
+import com.example.vulpinenotes.data.BookEntity
+import com.example.vulpinenotes.data.toBook
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.firestore.*
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageException
-import com.google.firebase.storage.StorageReference
-import java.io.*
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.util.*
 
 class MainActivity : BaseActivity() {
 
-    // ──────────────────────────────────────────────────────────────
-    // UI + адаптер
-    // ──────────────────────────────────────────────────────────────
+    // UI
     private lateinit var booksRecyclerView: RecyclerView
     private lateinit var bookAdapter: BookAdapter
     private val books = mutableListOf<Book>()
@@ -48,22 +50,20 @@ class MainActivity : BaseActivity() {
     private lateinit var menuButton: ImageView
     private lateinit var navView: NavigationView
 
-    // ──────────────────────────────────────────────────────────────
-    // Диалог добавления/редактирования
-    // ──────────────────────────────────────────────────────────────
+    // Диалог
     private var currentCoverPreview: ImageView? = null
     private var currentBtnAddCover: Button? = null
     private var selectedImageFile: File? = null
-    private var isNewCoverSelected = false
 
     private lateinit var pickImageLauncher: ActivityResultLauncher<String>
 
-    // ──────────────────────────────────────────────────────────────
     // Firebase
-    // ──────────────────────────────────────────────────────────────
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
-    private var userListener: ListenerRegistration? = null
+
+    // Room
+    private lateinit var database: AppDatabase
+    private lateinit var coversDir: File
 
     private val PREFS_NAME = "app_prefs"
     private val KEY_THEME = "app_theme"
@@ -72,13 +72,8 @@ class MainActivity : BaseActivity() {
         private const val REQUEST_SETTINGS = 1001
         private const val REQUEST_ACCOUNT = 1002
         const val EXTRA_BOOK = "com.example.vulpinenotes.EXTRA_BOOK"
-        private const val MAX_RETRY = 3
-        private const val MAX_IMAGE_SIZE = 1_500_000L   // 1.5 МБ
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // onCreate
-    // ──────────────────────────────────────────────────────────────
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySavedTheme()
@@ -87,31 +82,36 @@ class MainActivity : BaseActivity() {
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
-        // ---------- Пикер изображения ----------
-        pickImageLauncher =
-            registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-                uri?.let { copyUriToCache(it) }?.let { file ->
-                    selectedImageFile = file
-                    isNewCoverSelected = true
-                    currentCoverPreview?.apply {
-                        setImageURI(Uri.fromFile(file))
-                        visibility = View.VISIBLE
-                    }
-                    currentBtnAddCover?.setText(R.string.change_cover)
-                } ?: Toast.makeText(this, "Ошибка обработки изображения", Toast.LENGTH_SHORT).show()
+        database = AppDatabase.getDatabase(this)
+        coversDir = File(filesDir, "covers").apply { mkdirs() }
+
+        pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let { copyUriToCache(it) }?.let { file ->
+                selectedImageFile = file
+                currentCoverPreview?.apply {
+                    setImageURI(Uri.fromFile(file))
+                    visibility = View.VISIBLE
+                }
+                currentBtnAddCover?.setText("Изменить обложку")
             }
+        }
 
         initViews()
         setupRecyclerView()
         setupDrawer()
         setupSearch()
         setupBackPress()
-        checkAuthAndLoadData()
+
+        observeLocalBooks()
+
+        if (auth.currentUser != null) {
+            syncLocalWithCloud(auth.currentUser!!)
+            showAddBookButton()
+        } else {
+            showAuthRequired()
+        }
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // UI init
-    // ──────────────────────────────────────────────────────────────
     private fun initViews() {
         drawerLayout = findViewById(R.id.drawer_layout)
         menuButton = findViewById(R.id.menu_button)
@@ -122,17 +122,14 @@ class MainActivity : BaseActivity() {
         booksRecyclerView = findViewById(R.id.books_recycler_view)
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Копирование Uri → File (в кэш)
-    // ──────────────────────────────────────────────────────────────
     private fun copyUriToCache(uri: Uri): File? {
         return try {
-            val name = getFileName(uri) ?: "cover_${System.currentTimeMillis()}.jpg"
-            val cacheFile = File(cacheDir, name)
+            val name = getFileName(uri) ?: "temp_cover_${System.currentTimeMillis()}.jpg"
+            val file = File(cacheDir, name)
             contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(cacheFile).use { output -> input.copyTo(output) }
-            } ?: return null
-            cacheFile
+                FileOutputStream(file).use { output -> input.copyTo(output) }
+            }
+            file
         } catch (e: Exception) {
             Log.e("COPY", "Failed to copy image", e)
             null
@@ -142,51 +139,27 @@ class MainActivity : BaseActivity() {
     private fun getFileName(uri: Uri): String? {
         return if (uri.scheme == "content") {
             contentResolver.query(uri, null, null, null, null)?.use {
-                if (it.moveToFirst()) it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-                else null
+                if (it.moveToFirst()) {
+                    it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                } else null
             }
-        } else null
+        } else uri.lastPathSegment
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Авторизация + загрузка книг
-    // ──────────────────────────────────────────────────────────────
-    private fun checkAuthAndLoadData() {
-        if (auth.currentUser != null) {
-            loadUserBooks(auth.currentUser!!)
-            showAddBookButton()
-        } else {
-            showAuthRequired()
-        }
-    }
-
-    private fun loadUserBooks(user: FirebaseUser) {
-        userListener?.remove()
-        books.clear()
-        bookAdapter.notifyDataSetChanged()
-
-        userListener = db.collection("users")
-            .document(user.uid)
-            .collection("books")
-            .orderBy("updatedAt", Query.Direction.DESCENDING)
-            .addSnapshotListener { snap, e ->
-                if (e != null) {
-                    Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_SHORT).show()
-                    return@addSnapshotListener
-                }
-                snap ?: return@addSnapshotListener
+    private fun observeLocalBooks() {
+        lifecycleScope.launch {
+            database.bookDao().getAllBooks().collect { bookEntities ->
                 books.clear()
-                snap.documents.forEach { doc ->
-                    doc.toObject(Book::class.java)?.copy(id = doc.id)?.let { books.add(it) }
-                }
+                books.addAll(bookEntities.map { it.toBook(coversDir) })
                 bookAdapter.notifyDataSetChanged()
             }
+        }
     }
 
     private fun showAuthRequired() {
         MaterialAlertDialogBuilder(this)
             .setTitle("Требуется вход")
-            .setMessage("Войдите через Google, чтобы сохранять книги в облако.")
+            .setMessage("Войдите через Google, чтобы синхронизировать книги в облако.")
             .setPositiveButton("Войти") { _, _ ->
                 startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
             }
@@ -194,235 +167,55 @@ class MainActivity : BaseActivity() {
             .setCancelable(false)
             .show()
         addBookButton.visibility = View.GONE
-        booksRecyclerView.visibility = View.GONE
     }
 
     private fun showAddBookButton() {
         addBookButton.visibility = View.VISIBLE
-        booksRecyclerView.visibility = View.VISIBLE
         addBookButton.setOnClickListener { showAddDialog() }
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Диалог добавления книги
-    // ──────────────────────────────────────────────────────────────
+    // ДИАЛОГ СОЗДАНИЯ КНИГИ
     private fun showAddDialog() {
-        if (auth.currentUser == null) {
-            Toast.makeText(this, "Войдите в аккаунт", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         val view = layoutInflater.inflate(R.layout.add_book_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.editText1)
         val editDesc = view.findViewById<TextInputEditText>(R.id.editText2)
+        val switchUpload = view.findViewById<SwitchMaterial>(R.id.switchOptionCloud)
         currentCoverPreview = view.findViewById(R.id.coverPreview)
         currentBtnAddCover = view.findViewById(R.id.btnAddCover)
 
         selectedImageFile = null
-        isNewCoverSelected = false
         currentCoverPreview?.visibility = View.GONE
-        currentBtnAddCover?.setText(R.string.add_cover)
+        currentBtnAddCover?.setText("Добавить обложку")
+        switchUpload?.isChecked = true
 
         currentBtnAddCover?.setOnClickListener {
-            isNewCoverSelected = true
             pickImageLauncher.launch("image/*")
         }
 
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.add_book)
+            .setTitle("Новая книга")
             .setView(view)
-            .setPositiveButton(R.string.save) { _, _ ->
+            .setPositiveButton("Создать") { _, _ ->
                 val title = editTitle.text.toString().trim()
                 val desc = editDesc.text.toString().trim()
                 if (title.isBlank() && desc.isBlank()) {
-                    Toast.makeText(this, R.string.fill_at_least_one_field, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Введите название или описание", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                addBookToFirestore(
-                    title = title.ifBlank { getString(R.string.no_title) },
-                    desc = desc.ifBlank { getString(R.string.unknown_desc) },
-                    coverFile = selectedImageFile
+
+                addBookLocally(
+                    title = title.ifBlank { "Без названия" },
+                    desc = desc.ifBlank { "Нет описания" },
+                    coverFile = selectedImageFile,
+                    uploadToCloud = switchUpload?.isChecked == true
                 )
             }
-            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .setNegativeButton("Отмена", null)
             .show()
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Загрузка обложки
-    // ──────────────────────────────────────────────────────────────
-    private fun uploadCoverAndGetUrl(
-        coverFile: File?,
-        onComplete: (String?) -> Unit,
-        attempt: Int = 0
-    ) {
-        if (coverFile == null || !coverFile.exists() || coverFile.length() == 0L) {
-            onComplete(null)
-            return
-        }
-
-        val user = auth.currentUser ?: run {
-            onComplete(null)
-            return
-        }
-
-        val fileToUpload = if (coverFile.length() > MAX_IMAGE_SIZE) {
-            compressImageFile(coverFile) ?: coverFile
-        } else coverFile
-
-        val storage = FirebaseStorage.getInstance()
-        val bucketName = storage.app.options.storageBucket // правильное получение имени бакета
-        Log.d("UPLOAD", "Bucket: $bucketName")
-
-        val fileName = "cover_${UUID.randomUUID()}.jpg"
-        val ref = storage.reference.child("covers/${user.uid}/$fileName")
-        Log.d("UPLOAD", "Uploading ${fileToUpload.length()} bytes → ${ref.path}")
-
-        try {
-            val stream = FileInputStream(fileToUpload)
-            val task = ref.putStream(stream)
-
-            task.addOnSuccessListener {
-                Log.d("UPLOAD", "Upload OK, fetching URL")
-                Thread.sleep(800)
-
-                ref.downloadUrl.addOnSuccessListener { uri ->
-                    Log.d("UPLOAD", "URL: $uri")
-                    fileToUpload.delete()
-                    if (fileToUpload != coverFile) coverFile.delete()
-                    onComplete(uri.toString())
-                }.addOnFailureListener { e ->
-                    handleUrlError(e, ref, fileToUpload, coverFile, onComplete, attempt)
-                }
-            }.addOnFailureListener { e ->
-                handleUploadError(e, fileToUpload, coverFile, onComplete, attempt, ref)
-            }
-        } catch (e: Exception) {
-            Log.e("UPLOAD", "IO error", e)
-            onComplete(null)
-        }
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Обработка ошибок
-    // ──────────────────────────────────────────────────────────────
-    private fun handleUploadError(
-        e: Exception,
-        fileToUpload: File,
-        originalFile: File,
-        onComplete: (String?) -> Unit,
-        attempt: Int,
-        ref: StorageReference
-    ) {
-        Log.e("UPLOAD", "Upload failed (attempt $attempt)", e)
-
-        if (e is StorageException && e.httpResultCode == 404 && attempt < MAX_RETRY) {
-            Log.d("UPLOAD", "Retry ${attempt + 1}/$MAX_RETRY")
-            uploadCoverAndGetUrl(originalFile, onComplete, attempt + 1)
-            return
-        }
-
-        val msg = when ((e as? StorageException)?.httpResultCode) {
-            404 -> "Бакет не найден. Проверь google-services.json"
-            401 -> "Не авторизован"
-            else -> e.message ?: "Неизвестная ошибка"
-        }
-        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-        fileToUpload.delete()
-        if (fileToUpload != originalFile) originalFile.delete()
-        onComplete(null)
-    }
-
-    private fun handleUrlError(
-        e: Exception,
-        ref: StorageReference,
-        fileToUpload: File,
-        originalFile: File,
-        onComplete: (String?) -> Unit,
-        attempt: Int
-    ) {
-        Log.e("UPLOAD", "URL fetch failed (attempt $attempt)", e)
-        if (e is StorageException && e.httpResultCode == 404 && attempt < MAX_RETRY) {
-            Log.d("UPLOAD", "Retry URL ${attempt + 1}/$MAX_RETRY")
-            uploadCoverAndGetUrl(originalFile, onComplete, attempt + 1)
-            return
-        }
-        Toast.makeText(this, "Не удалось получить URL", Toast.LENGTH_LONG).show()
-        fileToUpload.delete()
-        if (fileToUpload != originalFile) originalFile.delete()
-        onComplete(null)
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Компрессия
-    // ──────────────────────────────────────────────────────────────
-    private fun compressImageFile(src: File): File? {
-        return try {
-            val bmp = BitmapFactory.decodeFile(src.path)
-            val out = ByteArrayOutputStream()
-            bmp.compress(Bitmap.CompressFormat.JPEG, 75, out)
-            val compressed = File(cacheDir, "compressed_${System.currentTimeMillis()}.jpg")
-            compressed.writeBytes(out.toByteArray())
-            compressed
-        } catch (e: Exception) {
-            Log.e("COMPRESS", "Failed", e)
-            null
-        }
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Сохранение книги
-    // ──────────────────────────────────────────────────────────────
-    private fun saveBookToFirestore(
-        user: FirebaseUser,
-        title: String,
-        desc: String,
-        coverUrl: String?,
-        bookId: String? = null,
-        chaptersCount: Int = 0
-    ) {
-        val ref = if (bookId != null) {
-            db.collection("users").document(user.uid).collection("books").document(bookId)
-        } else {
-            db.collection("users").document(user.uid).collection("books").document()
-        }
-
-        val book = Book(
-            id = ref.id,
-            title = title,
-            desc = desc,
-            coverUri = coverUrl,
-            chaptersCount = chaptersCount,
-            updatedAt = System.currentTimeMillis()
-        )
-
-        ref.set(book)
-            .addOnSuccessListener {
-                Toast.makeText(this, if (bookId == null) "Книга добавлена" else "Книга обновлена", Toast.LENGTH_SHORT).show()
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Ошибка сохранения: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Добавление книги
-    // ──────────────────────────────────────────────────────────────
-    private fun addBookToFirestore(title: String, desc: String, coverFile: File?) {
-        val user = auth.currentUser ?: return
-        if (coverFile == null) {
-            saveBookToFirestore(user, title, desc, null)
-            return
-        }
-        uploadCoverAndGetUrl(coverFile, { url ->
-            saveBookToFirestore(user, title, desc, url)
-        })
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Редактирование книги
-    // ──────────────────────────────────────────────────────────────
-    private fun showEditDialog(book: Book, position: Int) {
+    // ДИАЛОГ РЕДАКТИРОВАНИЯ — УБИРАЕМ СВИТЧ!
+    private fun showEditDialog(book: Book) {
         val view = layoutInflater.inflate(R.layout.edit_book_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.editText1)
         val editDesc = view.findViewById<TextInputEditText>(R.id.editText2)
@@ -433,69 +226,171 @@ class MainActivity : BaseActivity() {
         editDesc.setText(book.desc)
 
         selectedImageFile = null
-        isNewCoverSelected = false
 
-        if (!book.coverUri.isNullOrBlank()) {
-            Glide.with(this).load(book.coverUri)
-                .placeholder(R.drawable.book_cover_placeholder)
-                .into(currentCoverPreview!!)
+        if (book.coverUri != null) {
+            Glide.with(this).load(book.coverUri).into(currentCoverPreview!!)
             currentCoverPreview?.visibility = View.VISIBLE
-        } else currentCoverPreview?.visibility = View.GONE
+            currentBtnAddCover?.setText("Изменить обложку")
+        } else {
+            currentCoverPreview?.visibility = View.GONE
+            currentBtnAddCover?.setText("Добавить обложку")
+        }
 
-        currentBtnAddCover?.setText(R.string.change_cover)
         currentBtnAddCover?.setOnClickListener {
-            isNewCoverSelected = true
             pickImageLauncher.launch("image/*")
         }
 
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.edit)
+            .setTitle("Редактировать книгу")
             .setView(view)
-            .setPositiveButton(R.string.save) { _, _ ->
-                val title = editTitle.text.toString().trim()
-                val desc = editDesc.text.toString().trim()
-                if (title.isBlank() && desc.isBlank()) {
-                    Toast.makeText(this, R.string.fill_at_least_one_field, Toast.LENGTH_SHORT).show()
+            .setPositiveButton("Сохранить") { _, _ ->
+                val newTitle = editTitle.text.toString().trim()
+                val newDesc = editDesc.text.toString().trim()
+
+                if (newTitle.isBlank() && newDesc.isBlank()) {
+                    Toast.makeText(this, "Заполните хотя бы одно поле", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                val finalTitle = title.ifBlank { getString(R.string.no_title) }
-                val finalDesc = desc.ifBlank { getString(R.string.unknown_desc) }
 
-                if (!isNewCoverSelected) {
-                    saveBookToFirestore(
-                        user = auth.currentUser!!,
-                        title = finalTitle,
-                        desc = finalDesc,
-                        coverUrl = book.coverUri,
-                        bookId = book.id,
-                        chaptersCount = book.chaptersCount
-                    )
-                } else {
-                    uploadCoverAndGetUrl(selectedImageFile, { url ->
-                        saveBookToFirestore(
-                            user = auth.currentUser!!,
-                            title = finalTitle,
-                            desc = finalDesc,
-                            coverUrl = url,
-                            bookId = book.id,
-                            chaptersCount = book.chaptersCount
-                        )
-                    })
-                }
+                updateBookLocally(
+                    bookId = book.id,
+                    newTitle = newTitle.ifBlank { "Без названия" },
+                    newDesc = newDesc.ifBlank { "Нет описания" },
+                    newCoverFile = selectedImageFile
+                )
             }
-            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .setNegativeButton("Отмена", null)
             .show()
     }
+    // ДОБАВЛЕНИЕ КНИГИ
+    private fun addBookLocally(title: String, desc: String, coverFile: File?, uploadToCloud: Boolean) {
+        lifecycleScope.launch {
+            val bookId = UUID.randomUUID().toString()
+            val coverPath = coverFile?.let {
+                val dest = File(coversDir, "cover_$bookId.jpg")
+                it.copyTo(dest, overwrite = true)
+                dest.absolutePath
+            }
 
-    // ──────────────────────────────────────────────────────────────
-    // UI методы
-    // ──────────────────────────────────────────────────────────────
+            val bookEntity = BookEntity(
+                id = bookId,
+                title = title,
+                desc = desc,
+                coverPath = coverPath,
+                updatedAt = System.currentTimeMillis(),
+                cloudSynced = uploadToCloud
+            )
+
+            database.bookDao().insertBook(bookEntity)
+
+            if (uploadToCloud && auth.currentUser != null) {
+                syncBookToCloud(bookEntity, auth.currentUser!!)
+            }
+
+            Toast.makeText(this@MainActivity, "Книга добавлена", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ОБНОВЛЕНИЕ КНИГИ (с контролем облака!)
+    private fun updateBookLocally(
+        bookId: String,
+        newTitle: String,
+        newDesc: String,
+        newCoverFile: File?
+    ) {
+        lifecycleScope.launch {
+            val currentBook = database.bookDao().getBookById(bookId) ?: return@launch
+
+            val finalCoverPath = newCoverFile?.let {
+                val destFile = File(coversDir, "cover_$bookId.jpg")
+                it.copyTo(destFile, overwrite = true)
+                destFile.absolutePath
+            } ?: currentBook.coverPath
+
+            val updatedBook = currentBook.copy(
+                title = newTitle,
+                desc = newDesc,
+                coverPath = finalCoverPath,
+                updatedAt = System.currentTimeMillis()
+                // cloudSynced НЕ ТРОГАЕМ — остаётся как при создании!
+            )
+
+            database.bookDao().insertBook(updatedBook)
+
+            // Если книга была в облаке — обновляем её там
+            if (currentBook.cloudSynced && auth.currentUser != null) {
+                syncBookToCloud(updatedBook, auth.currentUser!!)
+            }
+
+            Toast.makeText(this@MainActivity, "Книга обновлена", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun syncBookToCloud(book: BookEntity, user: FirebaseUser) {
+        val data = hashMapOf(
+            "title" to book.title,
+            "desc" to book.desc,
+            "chaptersCount" to book.chaptersCount,
+            "updatedAt" to book.updatedAt
+        )
+
+        db.collection("users")
+            .document(user.uid)
+            .collection("books")
+            .document(book.id)
+            .set(data)
+            .addOnSuccessListener {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    database.bookDao().updateCloudState(book.id, true)
+                }
+            }
+            .addOnFailureListener {
+                Log.e("SYNC", "Ошибка синхронизации: ${book.title}", it)
+            }
+    }
+
+
+    private fun syncLocalWithCloud(user: FirebaseUser) {
+        db.collection("users")
+            .document(user.uid)
+            .collection("books")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("SYNC", "Ошибка слушателя Firestore", error)
+                    return@addSnapshotListener
+                }
+
+                snapshot?.documents?.forEach { doc ->
+                    val cloudBook = doc.toObject(BookEntity::class.java)?.copy(id = doc.id)
+                    cloudBook?.let { book ->
+                        lifecycleScope.launch {
+                            // Проверяем, есть ли локально
+                            val localBook = withContext(Dispatchers.IO) {
+                                database.bookDao().getBookById(book.id)
+                            }
+
+                            // Если локальной нет ИЛИ облачная новее — обновляем
+                            if (localBook == null || (book.updatedAt ?: 0) > (localBook.updatedAt)) {
+                                database.bookDao().insertBook(
+                                    book.copy(
+                                        coverPath = localBook?.coverPath,  // сохраняем локальную обложку
+                                        cloudSynced = true
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+    }
+
+    // Остальные функции без изменений...
     private fun setupRecyclerView() {
         bookAdapter = BookAdapter(
             books,
             this,
             onShowInfo = { showBookInfo(it) },
-            onEditBook = { book, pos -> showEditDialog(book, pos) },
+            onEditBook = { book, _ -> showEditDialog(book) },
             onBookClick = { startBookActivity(it) }
         )
         booksRecyclerView.adapter = bookAdapter
@@ -506,26 +401,12 @@ class MainActivity : BaseActivity() {
         startActivity(Intent(this, BookActivity::class.java).putExtra(EXTRA_BOOK, book))
     }
 
-    private fun setupDrawer() {
-        menuButton.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_account -> startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
-                R.id.nav_cloud -> startActivity(Intent(this, CloudActivity::class.java))
-                R.id.nav_support -> startActivity(Intent(this, SupportActivity::class.java))
-                R.id.nav_settings -> startActivityForResult(Intent(this, SettingsActivity::class.java), REQUEST_SETTINGS)
-            }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
-    }
-
     private fun showBookInfo(book: Book) {
         val v = layoutInflater.inflate(R.layout.dialog_book_info, null)
         v.findViewById<TextView>(R.id.dialogTitle).text = book.title
         v.findViewById<TextView>(R.id.dialogAuthor).text = book.desc.ifBlank { getString(R.string.unknown_desc) }
         val cover = v.findViewById<ImageView>(R.id.dialogCover)
-        if (!book.coverUri.isNullOrBlank()) {
+        if (book.coverUri != null) {
             Glide.with(this).load(book.coverUri).placeholder(R.drawable.book_cover_placeholder).into(cover)
             cover.visibility = View.VISIBLE
         } else cover.visibility = View.GONE
@@ -537,11 +418,24 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
+    private fun setupDrawer() {
+        menuButton.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_account -> startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
+                R.id.nav_settings -> startActivityForResult(Intent(this, SettingsActivity::class.java), REQUEST_SETTINGS)
+                R.id.nav_cloud -> startActivity(Intent(this, CloudActivity::class.java))
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
+    }
+
     private fun setupSearch() {
         searchEditText.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                clearButton.visibility = if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
+                clearButton.visibility = if (s.isNullOrBlank()) View.GONE else View.VISIBLE
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -554,54 +448,31 @@ class MainActivity : BaseActivity() {
     private fun setupBackPress() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.closeDrawer(GravityCompat.START)
-                else finish()
+                if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                } else {
+                    finish()
+                }
             }
         })
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Жизненный цикл
-    // ──────────────────────────────────────────────────────────────
-    override fun onStart() {
-        super.onStart()
-        auth.currentUser?.let {
-            if (userListener == null) {
-                loadUserBooks(it)
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_ACCOUNT && resultCode == RESULT_OK) {
+            auth.currentUser?.let {
+                syncLocalWithCloud(it)
                 showAddBookButton()
             }
         }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        userListener?.remove()
-        userListener = null
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        cacheDir.listFiles()?.forEach { f ->
-            if (f.name.startsWith("cover_") || f.name.endsWith(".jpg")) f.delete()
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK) {
-            val changed = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getBoolean("lang_changed", false)
-            if (changed) {
-                getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().remove("lang_changed").apply()
-                recreate()
-            }
+            recreate()
         }
-        if (requestCode == REQUEST_ACCOUNT && resultCode == RESULT_OK) checkAuthAndLoadData()
     }
 
     private fun applySavedTheme() {
         val mode = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        if (AppCompatDelegate.getDefaultNightMode() != mode) AppCompatDelegate.setDefaultNightMode(mode)
+        AppCompatDelegate.setDefaultNightMode(mode)
     }
 }

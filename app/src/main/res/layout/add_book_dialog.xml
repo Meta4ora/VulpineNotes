@@ -7,7 +7,7 @@
     android:padding="16dp">
 
     <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/switchOption"
+        android:id="@+id/switchOptionCloud"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/save_to_cloud"

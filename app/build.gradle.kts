@@ -1,8 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("kotlin-kapt")
+    id("kotlin-parcelize")
     id("com.google.gms.google-services")
-    id("org.jetbrains.kotlin.plugin.parcelize")
 }
 
 android {
@@ -55,8 +56,9 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")  // Firestore (основной модуль)
     implementation("com.google.firebase:firebase-auth")       // Auth (основной)
     implementation("com.google.firebase:firebase-storage")    // Storage (если нужно для обложек)
-
+    implementation("com.google.firebase:firebase-firestore-ktx:24.10.3")
     implementation("com.google.firebase:firebase-database")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Остальные зависимости (не Firebase)
     implementation(libs.androidx.core.ktx)
@@ -84,6 +86,13 @@ dependencies {
 
     // Glide для аватарок
     implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    implementation ("androidx.room:room-runtime:2.6.1")
+    implementation ("androidx.room:room-ktx:2.6.1")
+    kapt ("androidx.room:room-compiler:2.6.1")
+
+    // Для работы с Coroutines
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // Тесты
     testImplementation(libs.junit)
