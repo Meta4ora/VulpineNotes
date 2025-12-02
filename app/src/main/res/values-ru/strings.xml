@@ -13,6 +13,12 @@
 
     <!-- Главный экран -->
     <string name="search_bar">Поиск</string>
+    <string name="options">Настройки</string>
+    <string name="cloud">Облако</string>
+    <string name="account">Аккаунт</string>
+    <string name="help">Помощь</string>
+    <string name="addition">Дополнительно</string>
+    <string name="sync">Synchronization</string>
 
     <!-- Добавление книги -->
     <string name="add_book">Добавить книгу</string>
@@ -28,14 +34,27 @@
     <string name="reset">Сброс</string>
     <string name="no_title">Без названия</string>
     <string name="no_desc">Без описания</string>
-    <string name="unknown_author">Неизвестный автор</string>
+    <string name="unknown_desc">Нету описания</string>
     <string name="book_added">Книга добавлена!</string>
     <string name="fill_at_least_one_field">Заполните хотя бы одно поле</string>
 
     <!-- Информация о книге -->
     <string name="info">Информация</string>
     <string name="book_cover">Обложка книги</string>
+    <string name="edit">Изменить</string>
+    <string name="book_updated">Книга обновлена</string>
+    <string name="chapters_count">%d глав</string>
+    <string name="delete">Удалить</string>
 
     <!-- Другое -->
     <string name="menu">Меню</string>
+    <string name="upload_to_cloud">Отправить в облако</string>
+    <string name="confirm_upload">Вы уверены, что хотите отправить книгу \"%s\" в облачное хранилище?</string>
+    <string name="upload_started">Отправка книги в облако...</string>
+    <string name="upload_cancelled">Отправка отменена</string>
+    <string name="export_cancelled">Экспорт отменен</string>
+    <string name="export_confirm">Вы уверены что хотите экспортировать книгу?</string>
+    <string name="export">Экспортировать</string>
+    <string name="export_started">Экспорт книги...</string>
+    <string name="default_web_client_id">59321474403-kst2avv2kub814kcpd6dgrbt846n9uvs.apps.googleusercontent.com</string>
 </resources>

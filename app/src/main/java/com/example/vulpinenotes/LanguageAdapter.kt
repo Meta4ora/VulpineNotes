@@ -15,7 +15,6 @@ class LanguageAdapter(
     private val languages: List<Language>
 ) : ArrayAdapter<Language>(context, resource, languages) {
 
-    // Эталонный список — не меняется
     private val allLanguages = languages.toList()
 
     override fun getCount(): Int = allLanguages.size
@@ -41,7 +40,7 @@ class LanguageAdapter(
         return view
     }
 
-    // ВАЖНО: возвращаем Filter, который НИЧЕГО НЕ ФИЛЬТРУЕТ
+    // возвращаем Filter который ничего не фильтрует
     override fun getFilter(): Filter = object : Filter() {
         override fun performFiltering(constraint: CharSequence?): FilterResults {
             return FilterResults().apply {

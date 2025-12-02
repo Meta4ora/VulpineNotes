@@ -6,15 +6,16 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Switch -->
     <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/switchOption"
+        android:id="@+id/switchOptionCloud"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/save_to_cloud"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="16dp"
 
-    <!-- Обложка -->
+        app:thumbTint="@animator/switch_thumb_selector"
+        app:trackTint="@animator/switch_track_selector" />
+
     <ImageView
         android:id="@+id/coverPreview"
         android:layout_width="120dp"
@@ -33,7 +34,6 @@
         android:text="@string/add_cover"
         android:layout_marginBottom="16dp" />
 
-    <!-- Название -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/textInputLayout1"
         android:layout_width="match_parent"
@@ -49,11 +49,11 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Автор -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/textInputLayout2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         app:placeholderText="@string/enter_desc">
 
         <com.google.android.material.textfield.TextInputEditText

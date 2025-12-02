@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp">
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/book_cover_card"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="6dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintDimensionRatio="3:5">
+
+        <!-- Обложка -->
+        <ImageView
+            android:id="@+id/iv_cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/book_cover_placeholder"
+            android:contentDescription="Обложка книги" />
+
+        <!-- Градиентная подложка снизу (полупрозрачная!) -->
+        <View
+            android:id="@+id/bottom_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="75dp"
+            android:layout_gravity="bottom"
+            android:background="?attr/colorPrimaryContainer" />
+
+        <!-- Название на подложке -->
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="72dp"
+            android:layout_marginBottom="16dp"
+            android:text="Без названия"
+            android:textColor="@android:color/white"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"
+            app:layout_constraintBottom_toBottomOf="@id/bottom_overlay"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/iv_cloud_action" />
+
+        <!-- Кнопка облака в правом нижнем углу -->
+        <ImageView
+            android:id="@+id/iv_cloud_action"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/rounded_background_dark"
+            android:padding="14dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_cloud_upload"
+            android:contentDescription="Действие с облаком"
+            android:clickable="true"
+            android:focusable="true"
+            app:tint="@color/splash_bg" />
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Название снизу (как в MainActivity) -->
+    <TextView
+        android:id="@+id/tv_title_below"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Без названия"
+        android:textSize="16sp"
+        android:textColor="?attr/colorOnPrimary"
+        android:gravity="center_horizontal"
+        android:maxLines="2"
+        android:ellipsize="end"
+        app:layout_constraintTop_toBottomOf="@id/book_cover_card"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

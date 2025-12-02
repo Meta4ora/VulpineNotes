@@ -13,6 +13,12 @@
 
     <!-- Main Screen -->
     <string name="search_bar">Search</string>
+    <string name="options">Options</string>
+    <string name="cloud">Cloud</string>
+    <string name="account">Account</string>
+    <string name="help">Help</string>
+    <string name="addition">Secondary</string>
+    <string name="sync">Synchronization</string>
 
     <!-- Add Book -->
     <string name="add_book">Add Book</string>
@@ -28,14 +34,27 @@
     <string name="reset">Reset</string>
     <string name="no_title">No title</string>
     <string name="no_desc">No description</string>
-    <string name="unknown_author">Unknown author</string>
+    <string name="unknown_desc">None</string>
     <string name="book_added">Book added!</string>
     <string name="fill_at_least_one_field">Fill at least one field</string>
 
     <!-- Book Info -->
     <string name="info">Information</string>
     <string name="book_cover">Book cover</string>
+    <string name="edit">Edit</string>
+    <string name="book_updated">Book updated</string>
+    <string name="chapters_count">%d chapters</string>
+    <string name="delete">Delete</string>
 
     <!-- Other -->
     <string name="menu">Menu</string>
+    <string name="upload_to_cloud">Send to cloud</string>
+    <string name="confirm_upload">Are you sure to send book \"%s\" on cloud storage?</string>
+    <string name="upload_started">Sending to cloud...</string>
+    <string name="upload_cancelled">Sending canceled</string>
+    <string name="export_cancelled">Export canceled</string>
+    <string name="export_confirm">Are you sure to export this book?</string>
+    <string name="export">Export</string>
+    <string name="export_started">Export book...</string>
+    <string name="default_web_client_id">59321474403-kst2avv2kub814kcpd6dgrbt846n9uvs.apps.googleusercontent.com</string>
 </resources>

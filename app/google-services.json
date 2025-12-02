@@ -12,7 +12,20 @@
           "package_name": "com.example.vulpinenotes"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "59321474403-csi1o6vcupr3r7ch1cpt7so3dsadcddd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.vulpinenotes",
+            "certificate_hash": "49fd037d76c8d9c78b4d0c267f25d82b7cb05e09"
+          }
+        },
+        {
+          "client_id": "59321474403-kst2avv2kub814kcpd6dgrbt846n9uvs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCkq1Om5PSvD7ndsje1hBTHuPgeMhDSneE"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "59321474403-kst2avv2kub814kcpd6dgrbt846n9uvs.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

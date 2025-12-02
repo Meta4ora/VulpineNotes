@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_chapter_info"
+        android:title="Информация"
+        android:icon="@drawable/ic_info" />
+    <item
+        android:id="@+id/action_chapter_edit"
+        android:title="Изменить"
+        android:icon="@drawable/ic_edit" />
+    <item
+        android:id="@+id/action_chapter_delete"
+        android:title="Удалить"
+        android:icon="@drawable/ic_delete" />
+</menu>

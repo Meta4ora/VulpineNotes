@@ -15,29 +15,47 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintDimensionRatio="3:5"> <ImageView
-        android:id="@+id/book_cover"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:src="@drawable/book_cover_placeholder" android:contentDescription="Обложка книги" />
+        app:layout_constraintDimensionRatio="3:5">
+
+        <ImageView
+            android:id="@+id/book_cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/book_cover_placeholder"
+            android:contentDescription="Обложка книги" />
 
         <View
+            android:id="@+id/bottom_overlay"
             android:layout_width="match_parent"
             android:layout_height="64dp"
             android:layout_gravity="bottom"
-            android:background="?attr/colorPrimary"/>
+            android:background="?attr/colorPrimary" />
+
+        <TextView
+            android:id="@+id/chapters_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="12dp"
+            android:layout_marginBottom="24dp"
+            android:text="12 глав"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="@id/bottom_overlay"
+            app:layout_constraintStart_toStartOf="parent" />
 
         <ImageView
             android:id="@+id/book_menu_button"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_gravity="bottom|end"
             android:layout_marginEnd="4dp"
-            android:layout_marginBottom="2dp"
-            android:src="@drawable/ic_more_vert"
-            android:padding="4dp"
-            android:contentDescription="Меню книги" />
+            android:layout_marginBottom="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Меню книги"
+            android:padding="0dp"
+            android:src="@drawable/ic_more_vert" />
 
     </androidx.cardview.widget.CardView>
 
@@ -47,7 +65,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="Зов Ктулху Лавкрафт"
-        android:textSize="14sp"
+        android:textSize="18sp"
         android:textColor="?attr/colorOnPrimary"
         android:gravity="center_horizontal"
         android:maxLines="2"

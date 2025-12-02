@@ -6,8 +6,7 @@
     </style>
 
     <style name="Theme.VulpineNotes" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- В тёмной теме: оранжевый → серый -->
-        <item name="colorPrimary">#616161</item> <!-- Серый, светлее фона -->
+        <item name="colorPrimary">#616161</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#424242</item>
         <item name="colorOnPrimaryContainer">#FFFFFF</item>
@@ -22,5 +21,33 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="materialAlertDialogTheme">@style/CustomAlertDialogTheme</item>
+
+
     </style>
+
+    <style name="CustomAlertDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- Цвет текста -->
+        <item name="titleTextColor">?attr/colorOnPrimary</item>
+        <item name="android:textColor">?attr/colorOnPrimary</item>
+
+        <!-- Фон диалога -->
+        <item name="android:background">?attr/colorPrimaryContainer</item>
+
+        <!-- Стили кнопок -->
+        <item name="buttonBarPositiveButtonStyle">@style/DialogButtonStyle</item>
+        <item name="buttonBarNegativeButtonStyle">@style/DialogButtonStyle</item>
+        <item name="buttonBarNeutralButtonStyle">@style/DialogButtonStyle</item>
+
+    </style>
+
+    <style name="DialogButtonStyle" parent="Widget.Material3.Button.TextButton.Dialog">
+        <!-- Цвет текста кнопок -->
+        <item name="android:textColor">?attr/colorOnPrimary</item>
+        <!-- Можно добавить яркий фон -->
+        <item name="android:backgroundTint">?attr/colorPrimary</item>
+        <!-- Немного радиуса -->
+        <item name="cornerRadius">12dp</item>
+    </style>
+
 </resources>
