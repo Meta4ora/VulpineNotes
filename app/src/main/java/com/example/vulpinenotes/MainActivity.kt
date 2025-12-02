@@ -318,27 +318,6 @@ class MainActivity : BaseActivity() {
             Toast.makeText(this@MainActivity, "Книга обновлена", Toast.LENGTH_SHORT).show()
         }
     }
-    private fun syncBookToCloud(book: BookEntity, user: FirebaseUser) {
-        val data = hashMapOf(
-            "title" to book.title,
-            "desc" to book.desc,
-            "chaptersCount" to book.chaptersCount,
-            "updatedAt" to book.updatedAt
-        )
-        db.collection("users")
-            .document(user.uid)
-            .collection("books")
-            .document(book.id)
-            .set(data)
-            .addOnSuccessListener {
-                lifecycleScope.launch(Dispatchers.IO) {
-                    database.bookDao().updateCloudState(book.id, true)
-                }
-            }
-            .addOnFailureListener {
-                Log.e("SYNC", "Ошибка синхронизации книги ${book.title}", it)
-            }
-    }
     // === ГЛАВНЫЕ ФУНКЦИИ СИНХРОНИЗАЦИИ ГЛАВ ===
     private suspend fun uploadAllChaptersForBook(bookId: String, user: FirebaseUser) {
         val isSynced = withContext(Dispatchers.IO) {
@@ -375,9 +354,22 @@ class MainActivity : BaseActivity() {
                 .collection("chapters")
                 .get()
                 .await()
+
             val cloudChapters = snapshot.documents.mapNotNull { doc ->
-                doc.toObject(ChapterEntity::class.java)
+                val chapter = doc.toObject(Chapter::class.java) ?: return@mapNotNull null
+                // Преобразуем в Entity с правильным bookId!
+                ChapterEntity(
+                    bookId = bookId,                    // ← ВОТ ЭТО КЛЮЧЕВОЕ!
+                    position = doc.id.toInt(),
+                    title = chapter.title,
+                    description = chapter.description,
+                    date = chapter.date,
+                    wordCount = chapter.wordCount,
+                    isFavorite = chapter.isFavorite,
+                    updatedAt = System.currentTimeMillis()
+                )
             }
+
             if (cloudChapters.isNotEmpty()) {
                 withContext(Dispatchers.IO) {
                     database.chapterDao().insertChapters(cloudChapters)

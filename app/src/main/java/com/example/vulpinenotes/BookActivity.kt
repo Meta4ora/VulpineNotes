@@ -197,17 +197,21 @@ class BookActivity : AppCompatActivity() {
 
     private fun deleteChapter(chapter: Chapter) {
         val position = chapters.indexOf(chapter)
+
         MaterialAlertDialogBuilder(this)
             .setTitle("Удалить главу?")
             .setMessage("«${chapter.title}» будет удалена безвозвратно.")
             .setPositiveButton("Удалить") { _, _ ->
                 lifecycleScope.launch {
-                    val entity = database.chapterDao().getChaptersForBookSync(book.id)
+                    // Находим entity по позиции
+                    val entity = database.chapterDao()
+                        .getChaptersForBookSync(book.id)
                         .find { it.position == position } ?: return@launch
 
+                    // Удаляем из Room
                     database.chapterDao().deleteChapter(entity)
 
-                    // Удаляем из облака
+                    // Удаляем из Firestore
                     if (book.cloudSynced) {
                         backgroundScope.launch {
                             try {
@@ -217,12 +221,12 @@ class BookActivity : AppCompatActivity() {
                                         .collection("books")
                                         .document(book.id)
                                         .collection("chapters")
-                                        .document(position.toString())
+                                        .document(position.toString())  // ← по старой позиции!
                                         .delete()
                                         .await()
                                 }
                             } catch (e: Exception) {
-                                Log.e(TAG, "Ошибка удаления главы из облака", e)
+                                Log.e(TAG, "Не удалось удалить главу из облака", e)
                             }
                         }
                     }
@@ -324,24 +328,35 @@ class BookActivity : AppCompatActivity() {
             .show()
     }
 
-    // ГЛАВНАЯ ФУНКЦИЯ — ГАРАНТИРОВАННАЯ ОТПРАВКА ГЛАВЫ В ОБЛАКО
-    private fun uploadChapterToCloud(chapter: ChapterEntity) {
+    private fun uploadChapterToCloud(chapterEntity: ChapterEntity) {
         val user = auth.currentUser ?: return
+
+        // Преобразуем Entity → чистый Chapter (без Parcelable-шумов и лишних полей)
+        val chapterForCloud = Chapter(
+            title = chapterEntity.title,
+            description = chapterEntity.description,
+            date = chapterEntity.date,
+            wordCount = chapterEntity.wordCount,
+            isFavorite = chapterEntity.isFavorite
+        )
+
         backgroundScope.launch {
             try {
-                firestore.collection("users")
+                firestore
+                    .collection("users")
                     .document(user.uid)
                     .collection("books")
-                    .document(chapter.bookId)
+                    .document(chapterEntity.bookId)
                     .collection("chapters")
-                    .document(chapter.position.toString())
-                    .set(chapter)
+                    .document(chapterEntity.position.toString())
+                    .set(chapterForCloud)  // ← Теперь 100% корректно сериализуется!
                     .await()
-                Log.d(TAG, "Глава «${chapter.title}» успешно синхронизирована с облаком")
+
+                Log.d(TAG, "Глава «${chapterEntity.title}» синхронизирована в облако (избранное: ${chapterEntity.isFavorite})")
             } catch (e: CancellationException) {
-                // Игнорируем — приложение закрывается
+                throw e // чтобы не ловить при завершении приложения
             } catch (e: Exception) {
-                Log.e(TAG, "Ошибка синхронизации главы «${chapter.title}»", e)
+                Log.e(TAG, "Ошибка синхронизации главы в облако", e)
             }
         }
     }
