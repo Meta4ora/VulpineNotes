@@ -17,12 +17,11 @@ class SplashActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Устанавливаем splash как стартовую активность
+        // устанавливаем splash как стартовую активность
         installSplashScreen()
 
         setContentView(R.layout.activity_splash)
 
-        // Анимация текста
         val textView = findViewById<TextView>(R.id.splash_text)
         textView.animate()
             .alpha(1f)
@@ -30,7 +29,6 @@ class SplashActivity : AppCompatActivity() {
             .setStartDelay(300)
             .start()
 
-        // Переход в MainActivity
         Handler(Looper.getMainLooper()).postDelayed({
             startActivity(Intent(this, MainActivity::class.java))
             finish()

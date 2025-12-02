@@ -1,5 +1,4 @@
 package com.example.vulpinenotes
-
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -22,8 +21,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.vulpinenotes.data.AppDatabase
 import com.example.vulpinenotes.data.BookEntity
+import com.example.vulpinenotes.data.ChapterEntity
 import com.example.vulpinenotes.data.toBook
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
@@ -32,13 +33,12 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
-
 class MainActivity : BaseActivity() {
-
     // UI
     private lateinit var booksRecyclerView: RecyclerView
     private lateinit var bookAdapter: BookAdapter
@@ -49,42 +49,32 @@ class MainActivity : BaseActivity() {
     private lateinit var clearButton: ImageView
     private lateinit var menuButton: ImageView
     private lateinit var navView: NavigationView
-
     // Диалог
     private var currentCoverPreview: ImageView? = null
     private var currentBtnAddCover: Button? = null
     private var selectedImageFile: File? = null
-
     private lateinit var pickImageLauncher: ActivityResultLauncher<String>
-
     // Firebase
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
-
     // Room
     private lateinit var database: AppDatabase
     private lateinit var coversDir: File
-
     private val PREFS_NAME = "app_prefs"
     private val KEY_THEME = "app_theme"
-
     companion object {
         private const val REQUEST_SETTINGS = 1001
         private const val REQUEST_ACCOUNT = 1002
         const val EXTRA_BOOK = "com.example.vulpinenotes.EXTRA_BOOK"
     }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySavedTheme()
         setContentView(R.layout.activity_main)
-
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
-
         database = AppDatabase.getDatabase(this)
         coversDir = File(filesDir, "covers").apply { mkdirs() }
-
         pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let { copyUriToCache(it) }?.let { file ->
                 selectedImageFile = file
@@ -95,23 +85,22 @@ class MainActivity : BaseActivity() {
                 currentBtnAddCover?.setText("Изменить обложку")
             }
         }
-
         initViews()
         setupRecyclerView()
         setupDrawer()
         setupSearch()
         setupBackPress()
-
         observeLocalBooks()
-
+// При запуске проверяем авторизацию
         if (auth.currentUser != null) {
-            syncLocalWithCloud(auth.currentUser!!)
             showAddBookButton()
+            updateNavHeader()
+            syncAllFromCloud(auth.currentUser!!) // ← важная строчка!
         } else {
             showAuthRequired()
+            updateNavHeader()
         }
     }
-
     private fun initViews() {
         drawerLayout = findViewById(R.id.drawer_layout)
         menuButton = findViewById(R.id.menu_button)
@@ -121,7 +110,6 @@ class MainActivity : BaseActivity() {
         addBookButton = findViewById(R.id.add_button)
         booksRecyclerView = findViewById(R.id.books_recycler_view)
     }
-
     private fun copyUriToCache(uri: Uri): File? {
         return try {
             val name = getFileName(uri) ?: "temp_cover_${System.currentTimeMillis()}.jpg"
@@ -135,7 +123,6 @@ class MainActivity : BaseActivity() {
             null
         }
     }
-
     private fun getFileName(uri: Uri): String? {
         return if (uri.scheme == "content") {
             contentResolver.query(uri, null, null, null, null)?.use {
@@ -145,7 +132,6 @@ class MainActivity : BaseActivity() {
             }
         } else uri.lastPathSegment
     }
-
     private fun observeLocalBooks() {
         lifecycleScope.launch {
             database.bookDao().getAllBooks().collect { bookEntities ->
@@ -155,7 +141,6 @@ class MainActivity : BaseActivity() {
             }
         }
     }
-
     private fun showAuthRequired() {
         MaterialAlertDialogBuilder(this)
             .setTitle("Требуется вход")
@@ -163,18 +148,15 @@ class MainActivity : BaseActivity() {
             .setPositiveButton("Войти") { _, _ ->
                 startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
             }
-            .setNegativeButton("Отмена") { d, _ -> d.dismiss() }
+            .setNegativeButton("Позже") { d, _ -> d.dismiss() }
             .setCancelable(false)
             .show()
         addBookButton.visibility = View.GONE
     }
-
     private fun showAddBookButton() {
         addBookButton.visibility = View.VISIBLE
         addBookButton.setOnClickListener { showAddDialog() }
     }
-
-    // ДИАЛОГ СОЗДАНИЯ КНИГИ
     private fun showAddDialog() {
         val view = layoutInflater.inflate(R.layout.add_book_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.editText1)
@@ -182,16 +164,13 @@ class MainActivity : BaseActivity() {
         val switchUpload = view.findViewById<SwitchMaterial>(R.id.switchOptionCloud)
         currentCoverPreview = view.findViewById(R.id.coverPreview)
         currentBtnAddCover = view.findViewById(R.id.btnAddCover)
-
         selectedImageFile = null
         currentCoverPreview?.visibility = View.GONE
         currentBtnAddCover?.setText("Добавить обложку")
         switchUpload?.isChecked = true
-
         currentBtnAddCover?.setOnClickListener {
             pickImageLauncher.launch("image/*")
         }
-
         MaterialAlertDialogBuilder(this)
             .setTitle("Новая книга")
             .setView(view)
@@ -202,7 +181,6 @@ class MainActivity : BaseActivity() {
                     Toast.makeText(this, "Введите название или описание", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-
                 addBookLocally(
                     title = title.ifBlank { "Без названия" },
                     desc = desc.ifBlank { "Нет описания" },
@@ -213,20 +191,15 @@ class MainActivity : BaseActivity() {
             .setNegativeButton("Отмена", null)
             .show()
     }
-
-    // ДИАЛОГ РЕДАКТИРОВАНИЯ — УБИРАЕМ СВИТЧ!
     private fun showEditDialog(book: Book) {
         val view = layoutInflater.inflate(R.layout.edit_book_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.editText1)
         val editDesc = view.findViewById<TextInputEditText>(R.id.editText2)
         currentCoverPreview = view.findViewById(R.id.coverPreview)
         currentBtnAddCover = view.findViewById(R.id.btnAddCover)
-
         editTitle.setText(book.title)
         editDesc.setText(book.desc)
-
         selectedImageFile = null
-
         if (book.coverUri != null) {
             Glide.with(this).load(book.coverUri).into(currentCoverPreview!!)
             currentCoverPreview?.visibility = View.VISIBLE
@@ -235,23 +208,19 @@ class MainActivity : BaseActivity() {
             currentCoverPreview?.visibility = View.GONE
             currentBtnAddCover?.setText("Добавить обложку")
         }
-
         currentBtnAddCover?.setOnClickListener {
             pickImageLauncher.launch("image/*")
         }
-
         MaterialAlertDialogBuilder(this)
             .setTitle("Редактировать книгу")
             .setView(view)
             .setPositiveButton("Сохранить") { _, _ ->
                 val newTitle = editTitle.text.toString().trim()
                 val newDesc = editDesc.text.toString().trim()
-
                 if (newTitle.isBlank() && newDesc.isBlank()) {
                     Toast.makeText(this, "Заполните хотя бы одно поле", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-
                 updateBookLocally(
                     bookId = book.id,
                     newTitle = newTitle.ifBlank { "Без названия" },
@@ -262,7 +231,6 @@ class MainActivity : BaseActivity() {
             .setNegativeButton("Отмена", null)
             .show()
     }
-    // ДОБАВЛЕНИЕ КНИГИ
     private fun addBookLocally(title: String, desc: String, coverFile: File?, uploadToCloud: Boolean) {
         lifecycleScope.launch {
             val bookId = UUID.randomUUID().toString()
@@ -271,61 +239,85 @@ class MainActivity : BaseActivity() {
                 it.copyTo(dest, overwrite = true)
                 dest.absolutePath
             }
-
+// Создаём книгу ВСЕГДА с cloudSynced = false
             val bookEntity = BookEntity(
                 id = bookId,
                 title = title,
                 desc = desc,
                 coverPath = coverPath,
                 updatedAt = System.currentTimeMillis(),
-                cloudSynced = uploadToCloud
+                cloudSynced = false  // ← ВСЕГДА false при создании
             )
-
             database.bookDao().insertBook(bookEntity)
-
+// Если пользователь хочет синхронизацию — пытаемся залить
             if (uploadToCloud && auth.currentUser != null) {
-                syncBookToCloud(bookEntity, auth.currentUser!!)
+                try {
+                    withContext(Dispatchers.IO) {
+                        db.collection("users")
+                            .document(auth.currentUser!!.uid)
+                            .collection("books")
+                            .document(bookId)
+                            .set(hashMapOf(
+                                "title" to title,
+                                "desc" to desc,
+                                "chaptersCount" to 0,
+                                "updatedAt" to System.currentTimeMillis()
+                            )).await()
+                    }
+// Только после УСПЕШНОЙ заливки — ставим флаг
+                    database.bookDao().updateCloudState(bookId, true)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Книга добавлена и синхронизирована", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Книга добавлена локально (нет сети)", Toast.LENGTH_LONG).show()
+                    }
+                    Log.e("SYNC", "Не удалось синхронизировать при создании", e)
+                }
+            } else {
+                Toast.makeText(this@MainActivity, "Книга добавлена локально", Toast.LENGTH_SHORT).show()
             }
-
-            Toast.makeText(this@MainActivity, "Книга добавлена", Toast.LENGTH_SHORT).show()
+// No need to call observeLocalBooks() again, as the flow will update automatically
         }
     }
-
-    // ОБНОВЛЕНИЕ КНИГИ (с контролем облака!)
-    private fun updateBookLocally(
-        bookId: String,
-        newTitle: String,
-        newDesc: String,
-        newCoverFile: File?
-    ) {
+    private fun updateBookLocally(bookId: String, newTitle: String, newDesc: String, newCoverFile: File?) {
         lifecycleScope.launch {
             val currentBook = database.bookDao().getBookById(bookId) ?: return@launch
-
             val finalCoverPath = newCoverFile?.let {
                 val destFile = File(coversDir, "cover_$bookId.jpg")
                 it.copyTo(destFile, overwrite = true)
                 destFile.absolutePath
             } ?: currentBook.coverPath
-
             val updatedBook = currentBook.copy(
                 title = newTitle,
                 desc = newDesc,
                 coverPath = finalCoverPath,
                 updatedAt = System.currentTimeMillis()
-                // cloudSynced НЕ ТРОГАЕМ — остаётся как при создании!
             )
-
             database.bookDao().insertBook(updatedBook)
-
-            // Если книга была в облаке — обновляем её там
+// Если книга была синхронизирована — обновляем в облаке
             if (currentBook.cloudSynced && auth.currentUser != null) {
-                syncBookToCloud(updatedBook, auth.currentUser!!)
+                try {
+                    withContext(Dispatchers.IO) {
+                        db.collection("users")
+                            .document(auth.currentUser!!.uid)
+                            .collection("books")
+                            .document(bookId)
+                            .update(mapOf(
+                                "title" to newTitle,
+                                "desc" to newDesc,
+                                "updatedAt" to System.currentTimeMillis()
+                            )).await()
+                    }
+                } catch (e: Exception) {
+                    Log.e("SYNC", "Не удалось обновить книгу в облаке", e)
+// Флаг НЕ сбрасываем — книга уже была в облаке, просто не обновилась сейчас
+                }
             }
-
             Toast.makeText(this@MainActivity, "Книга обновлена", Toast.LENGTH_SHORT).show()
         }
     }
-
     private fun syncBookToCloud(book: BookEntity, user: FirebaseUser) {
         val data = hashMapOf(
             "title" to book.title,
@@ -333,7 +325,6 @@ class MainActivity : BaseActivity() {
             "chaptersCount" to book.chaptersCount,
             "updatedAt" to book.updatedAt
         )
-
         db.collection("users")
             .document(user.uid)
             .collection("books")
@@ -345,46 +336,111 @@ class MainActivity : BaseActivity() {
                 }
             }
             .addOnFailureListener {
-                Log.e("SYNC", "Ошибка синхронизации: ${book.title}", it)
+                Log.e("SYNC", "Ошибка синхронизации книги ${book.title}", it)
             }
     }
-
-
-    private fun syncLocalWithCloud(user: FirebaseUser) {
-        db.collection("users")
-            .document(user.uid)
-            .collection("books")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("SYNC", "Ошибка слушателя Firestore", error)
-                    return@addSnapshotListener
+    // === ГЛАВНЫЕ ФУНКЦИИ СИНХРОНИЗАЦИИ ГЛАВ ===
+    private suspend fun uploadAllChaptersForBook(bookId: String, user: FirebaseUser) {
+        val isSynced = withContext(Dispatchers.IO) {
+            database.bookDao().getBookById(bookId)?.cloudSynced == true
+        }
+        if (!isSynced) return
+        try {
+            val localChapters = withContext(Dispatchers.IO) {
+                database.chapterDao().getChaptersForBookSync(bookId)
+            }
+            if (localChapters.isEmpty()) return
+            val batch = db.batch()
+            localChapters.forEach { chapter ->
+                val ref = db.collection("users")
+                    .document(user.uid)
+                    .collection("books")
+                    .document(bookId)
+                    .collection("chapters")
+                    .document(chapter.position.toString())
+                batch.set(ref, chapter)
+            }
+            batch.commit().await()
+            Log.d("SYNC", "Залито ${localChapters.size} глав для книги $bookId")
+        } catch (e: Exception) {
+            Log.e("SYNC", "Ошибка заливки глав книги $bookId", e)
+        }
+    }
+    private suspend fun downloadAllChaptersForBook(bookId: String, user: FirebaseUser) {
+        try {
+            val snapshot = db.collection("users")
+                .document(user.uid)
+                .collection("books")
+                .document(bookId)
+                .collection("chapters")
+                .get()
+                .await()
+            val cloudChapters = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(ChapterEntity::class.java)
+            }
+            if (cloudChapters.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    database.chapterDao().insertChapters(cloudChapters)
                 }
-
-                snapshot?.documents?.forEach { doc ->
-                    val cloudBook = doc.toObject(BookEntity::class.java)?.copy(id = doc.id)
-                    cloudBook?.let { book ->
-                        lifecycleScope.launch {
-                            // Проверяем, есть ли локально
-                            val localBook = withContext(Dispatchers.IO) {
-                                database.bookDao().getBookById(book.id)
-                            }
-
-                            // Если локальной нет ИЛИ облачная новее — обновляем
-                            if (localBook == null || (book.updatedAt ?: 0) > (localBook.updatedAt)) {
-                                database.bookDao().insertBook(
-                                    book.copy(
-                                        coverPath = localBook?.coverPath,  // сохраняем локальную обложку
-                                        cloudSynced = true
-                                    )
+                Log.d("SYNC", "Скачано ${cloudChapters.size} глав для книги $bookId")
+            }
+        } catch (e: Exception) {
+            Log.e("SYNC", "Ошибка скачивания глав книги $bookId", e)
+        }
+    }
+    // === ПОЛНАЯ ДВУСТОРОННЯЯ СИНХРОНИЗАЦИЯ ===
+    private fun syncAllFromCloud(user: FirebaseUser) {
+        lifecycleScope.launch {
+            try {
+                val snapshot = db.collection("users")
+                    .document(user.uid)
+                    .collection("books")
+                    .get()
+                    .await()
+                var processed = 0
+                for (doc in snapshot.documents) {
+                    val cloudBook = doc.toObject(BookEntity::class.java)?.copy(id = doc.id) ?: continue
+                    withContext(Dispatchers.IO) {
+                        val localBook = database.bookDao().getBookById(cloudBook.id)
+// Просто обновляем флаг — книга точно есть в облаке
+                        database.bookDao().updateCloudState(cloudBook.id, true)
+// И сохраняем остальные поля (если их нет локально)
+                        if (localBook == null) {
+                            database.bookDao().insertBook(
+                                cloudBook.copy(
+                                    coverPath = null,
+                                    cloudSynced = true
                                 )
-                            }
+                            )
+                        } else {
+                            database.bookDao().insertBook(
+                                localBook.copy(
+                                    title = cloudBook.title,
+                                    desc = cloudBook.desc,
+                                    updatedAt = cloudBook.updatedAt,
+                                    cloudSynced = true
+                                )
+                            )
                         }
                     }
+// Скачиваем главы из облака
+                    downloadAllChaptersForBook(cloudBook.id, user)
+// Заливаем локальные главы (если они новее или отсутствуют в облаке)
+                    uploadAllChaptersForBook(cloudBook.id, user)
+                    processed++
+                }
+                withContext(Dispatchers.Main) {
+                    if (processed > 0) {
+                        Toast.makeText(this@MainActivity, "Синхронизировано: $processed книг", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Ошибка синхронизации: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        }
     }
-
-    // Остальные функции без изменений...
     private fun setupRecyclerView() {
         bookAdapter = BookAdapter(
             books,
@@ -396,11 +452,9 @@ class MainActivity : BaseActivity() {
         booksRecyclerView.adapter = bookAdapter
         booksRecyclerView.layoutManager = GridLayoutManager(this, 2)
     }
-
     private fun startBookActivity(book: Book) {
         startActivity(Intent(this, BookActivity::class.java).putExtra(EXTRA_BOOK, book))
     }
-
     private fun showBookInfo(book: Book) {
         val v = layoutInflater.inflate(R.layout.dialog_book_info, null)
         v.findViewById<TextView>(R.id.dialogTitle).text = book.title
@@ -410,27 +464,31 @@ class MainActivity : BaseActivity() {
             Glide.with(this).load(book.coverUri).placeholder(R.drawable.book_cover_placeholder).into(cover)
             cover.visibility = View.VISIBLE
         } else cover.visibility = View.GONE
-
         MaterialAlertDialogBuilder(this, R.style.CustomAlertDialogTheme)
             .setTitle(R.string.info)
             .setView(v)
             .setPositiveButton("OK") { d, _ -> d.dismiss() }
             .show()
     }
-
     private fun setupDrawer() {
         menuButton.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
         navView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_account -> startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
-                R.id.nav_settings -> startActivityForResult(Intent(this, SettingsActivity::class.java), REQUEST_SETTINGS)
+                R.id.nav_sync -> {
+                    auth.currentUser?.let { user ->
+                        syncAllFromCloud(user)
+                        Toast.makeText(this, "Синхронизация запущена...", Toast.LENGTH_SHORT).show()
+                    } ?: Toast.makeText(this, "Войдите в аккаунт", Toast.LENGTH_LONG).show()
+                }
                 R.id.nav_cloud -> startActivity(Intent(this, CloudActivity::class.java))
+                R.id.nav_settings -> startActivityForResult(Intent(this, SettingsActivity::class.java), REQUEST_SETTINGS)
+                R.id.nav_support -> startActivityForResult(Intent(this, SupportActivity::class.java), REQUEST_SETTINGS)
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
     }
-
     private fun setupSearch() {
         searchEditText.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -444,7 +502,6 @@ class MainActivity : BaseActivity() {
             searchEditText.clearFocus()
         }
     }
-
     private fun setupBackPress() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -456,20 +513,44 @@ class MainActivity : BaseActivity() {
             }
         })
     }
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_ACCOUNT && resultCode == RESULT_OK) {
-            auth.currentUser?.let {
-                syncLocalWithCloud(it)
+            auth.currentUser?.let { user ->
+                syncAllFromCloud(user) // ← полная синхронизация после входа
                 showAddBookButton()
+                updateNavHeader()
             }
         }
         if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK) {
             recreate()
         }
     }
-
+    private fun updateNavHeader() {
+        val headerView = navView.getHeaderView(0)
+        val avatar = headerView.findViewById<ShapeableImageView>(R.id.nav_header_avatar)
+        val name = headerView.findViewById<TextView>(R.id.nav_header_name)
+        val email = headerView.findViewById<TextView>(R.id.nav_header_email)
+        val user = auth.currentUser
+        if (user != null) {
+            name.text = user.displayName ?: "Пользователь"
+            email.text = user.email ?: ""
+            user.photoUrl?.let { Glide.with(this).load(it).placeholder(R.drawable.ic_fox_logo).into(avatar) }
+                ?: avatar.setImageResource(R.drawable.ic_fox_logo)
+            headerView.setOnClickListener {
+                drawerLayout.closeDrawer(GravityCompat.START)
+                startActivity(Intent(this, AccountActivity::class.java))
+            }
+        } else {
+            name.text = "Гость"
+            email.text = "Нажмите, чтобы войти"
+            avatar.setImageResource(R.drawable.ic_fox_logo)
+            headerView.setOnClickListener {
+                drawerLayout.closeDrawer(GravityCompat.START)
+                startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
+            }
+        }
+    }
     private fun applySavedTheme() {
         val mode = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)

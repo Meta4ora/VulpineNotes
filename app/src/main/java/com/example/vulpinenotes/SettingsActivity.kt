@@ -31,7 +31,7 @@ class SettingsActivity : BaseActivity() {
     }
 
     private fun setupBackPressHandler() {
-        // Это обрабатывает свайп назад и системную кнопку назад
+        // это обрабатывает свайп назад и системную кнопку назад
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

@@ -40,7 +40,7 @@ class LanguageAdapter(
         return view
     }
 
-    // ВАЖНО: возвращаем Filter, который НИЧЕГО НЕ ФИЛЬТРУЕТ
+    // возвращаем Filter который ничего не фильтрует
     override fun getFilter(): Filter = object : Filter() {
         override fun performFiltering(constraint: CharSequence?): FilterResults {
             return FilterResults().apply {

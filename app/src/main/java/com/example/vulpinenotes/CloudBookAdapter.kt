@@ -15,7 +15,7 @@ class CloudBookAdapter(
 
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val coverImage: ImageView = itemView.findViewById(R.id.iv_cover)
-        val titleText: TextView = itemView.findViewById(R.id.tv_title_below)  // ← теперь снизу!
+        val titleText: TextView = itemView.findViewById(R.id.tv_title_below)
         val cloudButton: ImageView = itemView.findViewById(R.id.iv_cloud_action)
     }
 
@@ -41,10 +41,9 @@ class CloudBookAdapter(
             holder.coverImage.setImageResource(R.drawable.book_cover_placeholder)
         }
 
-        // ПРАВИЛЬНАЯ ИКОНКА!
         holder.cloudButton.setImageResource(
-            if (book.cloudSynced) R.drawable.ic_cloud_done      // в облаке — галочка
-            else R.drawable.ic_cloud_upload                     // локально — загрузить
+            if (book.cloudSynced) R.drawable.ic_cloud_done      // в облаке галочка
+            else R.drawable.ic_cloud_upload                     // локально загрузить
         )
 
         holder.cloudButton.setOnClickListener { onCloudClick(book) }

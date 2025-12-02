@@ -132,8 +132,9 @@ class BookAdapter(
         }
     }
 
-    // Опционально: полное удаление (и локально, и из облака)
-    // Добавь в book_context_menu.xml пункт с id action_delete_permanently
+    // Удаление из облака и лоркально одновременно
+    // надо добавить в book_context_menu.xml пункт с id action_delete_permanently
+    // пока убрал за ненадобностью
     /*
     private fun deleteBookEverywhere(book: Book, position: Int) {
         (context as? MainActivity)?.lifecycleScope?.launch(Dispatchers.IO) {

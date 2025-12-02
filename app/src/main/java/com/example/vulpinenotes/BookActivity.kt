@@ -1,45 +1,59 @@
-// BookActivity.kt
 package com.example.vulpinenotes
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.ImageButton
+import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.appcompat.widget.Toolbar
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.vulpinenotes.data.AppDatabase
+import com.example.vulpinenotes.data.ChapterEntity
+import com.example.vulpinenotes.data.toChapter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
-import androidx.activity.result.contract.ActivityResultContracts
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.*
+import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.*
 
 class BookActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_BOOK = "com.example.vulpinenotes.EXTRA_BOOK"
+        private const val TAG = "BookActivity"
     }
 
-    private lateinit var chapterAdapter: ChapterAdapter
+    private lateinit var book: Book
     private val chapters = mutableListOf<Chapter>()
+    private lateinit var chapterAdapter: ChapterAdapter
     private lateinit var recyclerView: RecyclerView
+    private lateinit var database: AppDatabase
+    private lateinit var firestore: FirebaseFirestore
+    private lateinit var auth: FirebaseAuth
+
+    // Гарантированная отправка — корутина живёт дольше Activity!
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val editChapterLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == ChapterEditActivity.RESULT_UPDATED_CHAPTER) {
-            val updatedChapter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                result.data?.getParcelableExtra(ChapterEditActivity.EXTRA_CHAPTER, Chapter::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                result.data?.getParcelableExtra(ChapterEditActivity.EXTRA_CHAPTER)
-            }
+            val updated = result.data?.getParcelableExtra<Chapter>(ChapterEditActivity.EXTRA_CHAPTER)
             val pos = result.data?.getIntExtra(ChapterEditActivity.EXTRA_CHAPTER_POSITION, -1) ?: -1
-            if (updatedChapter != null && pos != -1) {
-                chapters[pos] = updatedChapter
+            if (updated != null && pos != -1) {
+                chapters[pos] = updated
                 chapterAdapter.notifyItemChanged(pos)
             }
         }
@@ -49,6 +63,8 @@ class BookActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_book)
+        setSupportActionBar(findViewById(R.id.toolbar))
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -56,184 +72,287 @@ class BookActivity : AppCompatActivity() {
             insets
         }
 
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        database = AppDatabase.getDatabase(this)
+        firestore = FirebaseFirestore.getInstance()
+        auth = FirebaseAuth.getInstance()
 
-        val book: Book? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(EXTRA_BOOK, Book::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(EXTRA_BOOK)
-        }
+        book = intent.getParcelableExtra(EXTRA_BOOK) ?: run { finish(); return }
+        supportActionBar?.title = book.title
 
-        book?.let { b ->
-            supportActionBar?.title = b.title
+        setupRecyclerView()
+        setupFab()
+        loadChaptersFromRoom()
 
-            chapters.addAll(listOf(
-                Chapter("Глава 1: Начало пути", "Первая встреча с героем", "03.11.25", 225, false),
-                Chapter("Глава 2: Тёмный лес", "Опасности и тайны", "04.11.25", 512, true),
-                Chapter("Глава 3: Встреча с драконом", "Кульминация", "05.11.25", 890, false)
-            ))
-
-            recyclerView = findViewById(R.id.chapters_recycler_view)
-            chapterAdapter = ChapterAdapter(
-                chapters,
-                this,
-                onInfo = { showChapterInfo(it) },
-                onEdit = { chapter, pos -> showEditChapterDialog(chapter, pos) },
-                onDelete = { chapterAdapter.removeChapter(it) },
-                onFavoriteToggle = { toggleFavoriteWithAnimation(it) },
-                onChapterClick = { chapter, position ->
-                    val intent = Intent(this, ChapterEditActivity::class.java).apply {
-                        putExtra(ChapterEditActivity.EXTRA_CHAPTER, chapter)
-                        putExtra(ChapterEditActivity.EXTRA_CHAPTER_POSITION, position)
-                    }
-                    editChapterLauncher.launch(intent)
-                }
-            )
-
-            recyclerView.adapter = chapterAdapter
-            recyclerView.layoutManager = LinearLayoutManager(this)
-            setupDragAndDrop()
-        } ?: finish()
-
-        findViewById<ImageButton>(R.id.fab_add_chapter).setOnClickListener {
-            showAddChapterDialog()
+        // Просто выход — никаких "гарантированных" batch при закрытии
+        onBackPressedDispatcher.addCallback(this) {
+            finish()
         }
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.book_menu, menu)
+
+        // Если книга НЕ синхронизируется с облаком — скрываем кнопку
+        val syncItem = menu.findItem(R.id.action_sync)
+        syncItem.isVisible = book.cloudSynced
+
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_sync -> {
+                manualSyncAllChapters()
+                true
+            }
+            android.R.id.home -> {
+                onSupportNavigateUp()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun manualSyncAllChapters() {
+        if (!book.cloudSynced) return
+
+        lifecycleScope.launch {
+            val entities = database.chapterDao().getChaptersForBookSync(book.id)
+            entities.forEach { chapterEntity ->
+                uploadChapterToCloud(chapterEntity)
+            }
+            Toast.makeText(this@BookActivity, "Синхронизация завершена", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun setupRecyclerView() {
+        recyclerView = findViewById(R.id.chapters_recycler_view)
+        chapterAdapter = ChapterAdapter(
+            chapters,
+            this,
+            onInfo = { showChapterInfo(it) },
+            onEdit = { _, _ -> },
+            onDelete = { deleteChapter(it) },
+            onFavoriteToggle = { toggleFavorite(it) },
+            onChapterClick = { chapter, position -> openChapterEditor(chapter, position) }
+        )
+        recyclerView.adapter = chapterAdapter
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        setupDragAndDrop()
+    }
+
+    private fun setupFab() {
+        findViewById<ImageButton>(R.id.fab_add_chapter).setOnClickListener {
+            it.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100).withEndAction {
+                it.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                showAddChapterDialog()
+            }.start()
+        }
+    }
+
+    private fun loadChaptersFromRoom() {
+        lifecycleScope.launch {
+            database.chapterDao().getChaptersForBook(book.id).collect { entities ->
+                chapters.clear()
+                chapters.addAll(entities.map { it.toChapter() })
+                chapterAdapter.notifyDataSetChanged()
+            }
+        }
+    }
+
+    private fun showAddChapterDialog() {
+        val view = layoutInflater.inflate(R.layout.add_chapter_dialog, null)
+        val editTitle = view.findViewById<TextInputEditText>(R.id.edit_title)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Новая глава")
+            .setView(view)
+            .setPositiveButton("Создать") { _, _ ->
+                val title = editTitle.text.toString().trim()
+                if (title.isNotBlank()) {
+                    lifecycleScope.launch {
+                        val count = database.chapterDao().getChapterCount(book.id)
+                        val newChapter = ChapterEntity(
+                            bookId = book.id,
+                            position = count,
+                            title = title,
+                            description = "",
+                            date = SimpleDateFormat("dd.MM.yy", Locale.getDefault()).format(Date()),
+                            wordCount = 0,
+                            isFavorite = false,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        database.chapterDao().insertChapter(newChapter)
+
+                        // ГАРАНТИРОВАННАЯ отправка — даже если сразу выйти
+                        if (book.cloudSynced) {
+                            uploadChapterToCloud(newChapter)
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun deleteChapter(chapter: Chapter) {
+        val position = chapters.indexOf(chapter)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Удалить главу?")
+            .setMessage("«${chapter.title}» будет удалена безвозвратно.")
+            .setPositiveButton("Удалить") { _, _ ->
+                lifecycleScope.launch {
+                    val entity = database.chapterDao().getChaptersForBookSync(book.id)
+                        .find { it.position == position } ?: return@launch
+
+                    database.chapterDao().deleteChapter(entity)
+
+                    // Удаляем из облака
+                    if (book.cloudSynced) {
+                        backgroundScope.launch {
+                            try {
+                                auth.currentUser?.let { user ->
+                                    firestore.collection("users")
+                                        .document(user.uid)
+                                        .collection("books")
+                                        .document(book.id)
+                                        .collection("chapters")
+                                        .document(position.toString())
+                                        .delete()
+                                        .await()
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Ошибка удаления главы из облака", e)
+                            }
+                        }
+                    }
+
+                    reorderPositionsAfterDeletion(position)
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private suspend fun reorderPositionsAfterDeletion(deletedPosition: Int) {
+        val all = database.chapterDao().getChaptersForBookSync(book.id)
+            .filter { it.position > deletedPosition }
+
+        all.forEach { chapter ->
+            val updated = chapter.copy(
+                position = chapter.position - 1,
+                updatedAt = System.currentTimeMillis()
+            )
+            database.chapterDao().insertChapter(updated)
+            if (book.cloudSynced) {
+                uploadChapterToCloud(updated)
+            }
+        }
+    }
+
+    private fun toggleFavorite(chapter: Chapter) {
+        val position = chapters.indexOf(chapter)
+        lifecycleScope.launch {
+            val entity = database.chapterDao().getChaptersForBookSync(book.id)
+                .find { it.position == position } ?: return@launch
+
+            val updated = entity.copy(
+                isFavorite = !entity.isFavorite,
+                updatedAt = System.currentTimeMillis()
+            )
+            database.chapterDao().insertChapter(updated)
+
+            if (book.cloudSynced) {
+                uploadChapterToCloud(updated)
+            }
+        }
+    }
+
+    private fun openChapterEditor(chapter: Chapter, position: Int) {
+        val intent = Intent(this, ChapterEditActivity::class.java).apply {
+            putExtra(ChapterEditActivity.EXTRA_CHAPTER, chapter)
+            putExtra(ChapterEditActivity.EXTRA_CHAPTER_POSITION, position)
+            putExtra("book_id", book.id)
+            putExtra("book_cloud_synced", book.cloudSynced)
+        }
+        editChapterLauncher.launch(intent)
+    }
+
     private fun setupDragAndDrop() {
-        val itemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+        val helper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
         ) {
             override fun onMove(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
+                rv: RecyclerView,
+                vh: RecyclerView.ViewHolder,
                 target: RecyclerView.ViewHolder
             ): Boolean {
-                val from = viewHolder.adapterPosition
+                val from = vh.adapterPosition
                 val to = target.adapterPosition
 
-                val movedChapter = chapters.removeAt(from)
-                chapters.add(to, movedChapter)
-
+                chapters.add(to, chapters.removeAt(from))
                 chapterAdapter.notifyItemMoved(from, to)
+
+                lifecycleScope.launch {
+                    val allChapters = database.chapterDao().getChaptersForBookSync(book.id)
+                    allChapters.forEachIndexed { index, entity ->
+                        if (entity.position != index) {
+                            val updated = entity.copy(
+                                position = index,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            database.chapterDao().insertChapter(updated)
+                            if (book.cloudSynced) {
+                                uploadChapterToCloud(updated)
+                            }
+                        }
+                    }
+                }
                 return true
             }
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
-
-            override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
-                super.onSelectedChanged(viewHolder, actionState)
-                viewHolder?.itemView?.apply {
-                    elevation = if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) 16f else 4f
-                    alpha = if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) 0.9f else 1f
-                }
-            }
-
-            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
-                super.clearView(recyclerView, viewHolder)
-                sortFavoritesToTop()
-            }
         })
-        itemTouchHelper.attachToRecyclerView(recyclerView)
-    }
-
-    private fun toggleFavoriteWithAnimation(chapter: Chapter) {
-        val index = chapters.indexOf(chapter)
-        if (index == -1) return
-
-        val updatedChapter = chapter.copy(isFavorite = !chapter.isFavorite)
-        chapters[index] = updatedChapter
-        chapterAdapter.notifyItemChanged(index)
-
-        if (updatedChapter.isFavorite && index != 0) {
-            chapters.removeAt(index)
-            chapters.add(0, updatedChapter)
-            chapterAdapter.notifyItemMoved(index, 0)
-            recyclerView.scrollToPosition(0)
-        } else if (!updatedChapter.isFavorite) {
-            sortFavoritesToTop()
-        }
-    }
-
-
-    private fun sortFavoritesToTop() {
-        val sorted = chapters.sortedByDescending { it.isFavorite }.toMutableList()
-        if (sorted != chapters) {
-            chapters.clear()
-            chapters.addAll(sorted)
-            chapterAdapter.notifyDataSetChanged()
-            recyclerView.scrollToPosition(0)
-        }
+        helper.attachToRecyclerView(recyclerView)
     }
 
     private fun showChapterInfo(chapter: Chapter) {
         MaterialAlertDialogBuilder(this)
             .setTitle(chapter.title)
-            .setMessage("""
-                Описание: ${chapter.description.ifBlank { "Нет описания" }}
-                Дата: ${chapter.date}
-                Слов: ${chapter.wordCount}
-                Избранное: ${if (chapter.isFavorite) "Да" else "Нет"}
-            """.trimIndent())
+            .setMessage("Слов: ${chapter.wordCount}\nДата: ${chapter.date}\nИзбранное: ${if (chapter.isFavorite) "Да" else "Нет"}")
             .setPositiveButton("OK", null)
             .show()
     }
 
-    private fun showAddChapterDialog() {
-        val dialogView = layoutInflater.inflate(R.layout.add_chapter_dialog, null)
-        val editTitle = dialogView.findViewById<TextInputEditText>(R.id.edit_title)
-        val editDesc = dialogView.findViewById<TextInputEditText>(R.id.edit_description)
-
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Новая глава")
-            .setView(dialogView)
-            .setPositiveButton("Добавить") { _, _ ->
-                val title = editTitle.text.toString().trim()
-                if (title.isNotBlank()) {
-                    val newChapter = Chapter(
-                        title = title,
-                        description = editDesc.text.toString().trim(),
-                        date = "11.11.25",
-                        wordCount = 0
-                    )
-                    chapters.add(newChapter)
-                    chapterAdapter.notifyItemInserted(chapters.size - 1)
-                }
+    // ГЛАВНАЯ ФУНКЦИЯ — ГАРАНТИРОВАННАЯ ОТПРАВКА ГЛАВЫ В ОБЛАКО
+    private fun uploadChapterToCloud(chapter: ChapterEntity) {
+        val user = auth.currentUser ?: return
+        backgroundScope.launch {
+            try {
+                firestore.collection("users")
+                    .document(user.uid)
+                    .collection("books")
+                    .document(chapter.bookId)
+                    .collection("chapters")
+                    .document(chapter.position.toString())
+                    .set(chapter)
+                    .await()
+                Log.d(TAG, "Глава «${chapter.title}» успешно синхронизирована с облаком")
+            } catch (e: CancellationException) {
+                // Игнорируем — приложение закрывается
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка синхронизации главы «${chapter.title}»", e)
             }
-            .setNegativeButton("Отмена", null)
-            .show()
-    }
-
-    private fun showEditChapterDialog(chapter: Chapter, position: Int) {
-        val dialogView = layoutInflater.inflate(R.layout.add_chapter_dialog, null)
-        val editTitle = dialogView.findViewById<TextInputEditText>(R.id.edit_title)
-        val editDesc = dialogView.findViewById<TextInputEditText>(R.id.edit_description)
-
-        editTitle.setText(chapter.title)
-        editDesc.setText(chapter.description)
-
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Редактировать главу")
-            .setView(dialogView)
-            .setPositiveButton("Сохранить") { _, _ ->
-                val title = editTitle.text.toString().trim()
-                if (title.isNotBlank()) {
-                    chapters[position] = chapter.copy(
-                        title = title,
-                        description = editDesc.text.toString().trim()
-                    )
-                    chapterAdapter.notifyItemChanged(position)
-                }
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // backgroundScope живёт дальше — главы всё равно дойдут!
     }
 }

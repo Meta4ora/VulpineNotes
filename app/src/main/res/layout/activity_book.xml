@@ -35,7 +35,6 @@
                 app:title="Главы"
                 app:titleTextColor="?attr/colorOnPrimary"
                 app:titleTextAppearance="@style/TextAppearance.Material3.TitleMedium"
-                app:menu="@menu/book_menu"
                 style="@style/Widget.MaterialComponents.Toolbar.Primary"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp" />

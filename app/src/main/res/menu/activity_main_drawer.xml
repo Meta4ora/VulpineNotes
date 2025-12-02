@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:showIn="navigation_view">
 
-    <group android:checkableBehavior="single">
+    <group>
         <item
             android:id="@+id/nav_account"
             android:textColor="?attr/colorOnPrimary"
@@ -21,6 +21,10 @@
                 android:id="@+id/nav_settings"
                 android:textColor="?attr/colorOnPrimary"
                 android:title="@string/options" />
+            <item
+                android:id="@+id/nav_sync"
+                android:textColor="?attr/colorOnPrimary"
+                android:title="@string/sync" />
             <item
                 android:id="@+id/nav_support"
                 android:textColor="?attr/colorOnPrimary"

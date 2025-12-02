@@ -18,6 +18,7 @@
     <string name="account">Аккаунт</string>
     <string name="help">Помощь</string>
     <string name="addition">Дополнительно</string>
+    <string name="sync">Synchronization</string>
 
     <!-- Добавление книги -->
     <string name="add_book">Добавить книгу</string>

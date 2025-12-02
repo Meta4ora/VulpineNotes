@@ -90,7 +90,7 @@ class AccountActivity : AppCompatActivity() {
         auth.signInWithCredential(credential)
             .addOnSuccessListener { result ->
                 val user = result.user
-                // Сохраняем email и имена пользователя в Firestore (merge)
+                // сохохраняем email и имена пользователя в Firestore (merge)
                 if (user != null) {
                     val userData = mapOf(
                         "name" to (user.displayName ?: ""),
@@ -103,7 +103,7 @@ class AccountActivity : AppCompatActivity() {
                         .set(userData, SetOptions.merge())
                 }
                 updateUI(user)
-                // Возвращаемся в MainActivity с RESULT_OK, чтобы он обновил данные
+                // возвращаемся в MainActivity с RESULT_OK, чтобы он обновил данные
                 setResult(RESULT_OK)
                 finish()
             }

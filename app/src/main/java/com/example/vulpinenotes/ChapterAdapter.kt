@@ -43,7 +43,7 @@ class ChapterAdapter(
         holder.date.text = chapter.date
         holder.wordCount.text = "${chapter.wordCount} слов"
 
-        // Закладка
+        // закладка
         val tintColor = if (chapter.isFavorite) {
             ContextCompat.getColor(context, R.color.gold)
         } else {
@@ -52,12 +52,12 @@ class ChapterAdapter(
         holder.bookmarkIcon.imageTintList = ColorStateList.valueOf(tintColor)
         holder.bookmarkIcon.setOnClickListener { onFavoriteToggle(chapter) }
 
-        // Меню
+        // меню
         holder.menuButton.setOnClickListener { view ->
             showPopupMenu(view, chapter)
         }
 
-        // Клик по всей карточке - редактор
+        // клик по всей карточке - редактор
         holder.itemView.setOnClickListener {
             onChapterClick(chapter, position)
         }
