@@ -53,7 +53,7 @@ class BookRepository(
             .collection("books").document(book.id)
             .set(cloudBook)
             .addOnSuccessListener {
-// Помечаем как синхронизировано
+                // помечаем как синхронизировано
                 CoroutineScope(Dispatchers.IO).launch {
                     bookDao.insertBook(book.copy(cloudSynced = true))
                 }
@@ -76,9 +76,9 @@ class BookRepository(
     suspend fun deleteBook(bookId: String) {
         bookDao.deleteById(bookId)
         chapterDao.deleteChaptersForBook(bookId)
-// Удалить обложку
+        // удаление обложки
         File(storageDir, "cover_$bookId.jpg").takeIf { it.exists() }?.delete()
-// Удалить из облака
+        // удаление из облака
         FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
             db.collection("users").document(uid).collection("books").document(bookId).delete()
         }

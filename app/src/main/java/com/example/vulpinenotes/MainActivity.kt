@@ -91,7 +91,7 @@ class MainActivity : BaseActivity() {
         setupSearch()
         setupBackPress()
         observeLocalBooks()
-// При запуске проверяем авторизацию
+        // при запуске проверяем авторизацию
         if (auth.currentUser != null) {
             showAddBookButton()
             updateNavHeader()
@@ -239,17 +239,17 @@ class MainActivity : BaseActivity() {
                 it.copyTo(dest, overwrite = true)
                 dest.absolutePath
             }
-// Создаём книгу ВСЕГДА с cloudSynced = false
+            // создаём книгу ВСЕГДА с cloudSynced = false
             val bookEntity = BookEntity(
                 id = bookId,
                 title = title,
                 desc = desc,
                 coverPath = coverPath,
                 updatedAt = System.currentTimeMillis(),
-                cloudSynced = false  // ← ВСЕГДА false при создании
+                cloudSynced = false
             )
             database.bookDao().insertBook(bookEntity)
-// Если пользователь хочет синхронизацию — пытаемся залить
+            // если пользователь хочет синхронизацию — пытаемся залить
             if (uploadToCloud && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -264,7 +264,7 @@ class MainActivity : BaseActivity() {
                                 "updatedAt" to System.currentTimeMillis()
                             )).await()
                     }
-// Только после УСПЕШНОЙ заливки — ставим флаг
+                    // Только после успешной заливки — ставим флаг
                     database.bookDao().updateCloudState(bookId, true)
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "Книга добавлена и синхронизирована", Toast.LENGTH_SHORT).show()
@@ -278,7 +278,6 @@ class MainActivity : BaseActivity() {
             } else {
                 Toast.makeText(this@MainActivity, "Книга добавлена локально", Toast.LENGTH_SHORT).show()
             }
-// No need to call observeLocalBooks() again, as the flow will update automatically
         }
     }
     private fun updateBookLocally(bookId: String, newTitle: String, newDesc: String, newCoverFile: File?) {
@@ -296,7 +295,7 @@ class MainActivity : BaseActivity() {
                 updatedAt = System.currentTimeMillis()
             )
             database.bookDao().insertBook(updatedBook)
-// Если книга была синхронизирована — обновляем в облаке
+            // если книга была синхронизирована — обновляем в облаке
             if (currentBook.cloudSynced && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -312,13 +311,11 @@ class MainActivity : BaseActivity() {
                     }
                 } catch (e: Exception) {
                     Log.e("SYNC", "Не удалось обновить книгу в облаке", e)
-// Флаг НЕ сбрасываем — книга уже была в облаке, просто не обновилась сейчас
                 }
             }
             Toast.makeText(this@MainActivity, "Книга обновлена", Toast.LENGTH_SHORT).show()
         }
     }
-    // === ГЛАВНЫЕ ФУНКЦИИ СИНХРОНИЗАЦИИ ГЛАВ ===
     private suspend fun uploadAllChaptersForBook(bookId: String, user: FirebaseUser) {
         val isSynced = withContext(Dispatchers.IO) {
             database.bookDao().getBookById(bookId)?.cloudSynced == true
@@ -380,7 +377,6 @@ class MainActivity : BaseActivity() {
             Log.e("SYNC", "Ошибка скачивания глав книги $bookId", e)
         }
     }
-    // === ПОЛНАЯ ДВУСТОРОННЯЯ СИНХРОНИЗАЦИЯ ===
     private fun syncAllFromCloud(user: FirebaseUser) {
         lifecycleScope.launch {
             try {
@@ -394,9 +390,9 @@ class MainActivity : BaseActivity() {
                     val cloudBook = doc.toObject(BookEntity::class.java)?.copy(id = doc.id) ?: continue
                     withContext(Dispatchers.IO) {
                         val localBook = database.bookDao().getBookById(cloudBook.id)
-// Просто обновляем флаг — книга точно есть в облаке
+                        // просто обновляем флаг — книга точно есть в облаке
                         database.bookDao().updateCloudState(cloudBook.id, true)
-// И сохраняем остальные поля (если их нет локально)
+                        // и сохраняем остальные поля (если их нет локально)
                         if (localBook == null) {
                             database.bookDao().insertBook(
                                 cloudBook.copy(
@@ -415,9 +411,9 @@ class MainActivity : BaseActivity() {
                             )
                         }
                     }
-// Скачиваем главы из облака
+                    // скачиваем главы из облака
                     downloadAllChaptersForBook(cloudBook.id, user)
-// Заливаем локальные главы (если они новее или отсутствуют в облаке)
+                    // заливаем локальные главы (если они новее или отсутствуют в облаке)
                     uploadAllChaptersForBook(cloudBook.id, user)
                     processed++
                 }

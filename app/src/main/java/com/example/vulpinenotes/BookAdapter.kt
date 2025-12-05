@@ -42,7 +42,7 @@ class BookAdapter(
     override fun onBindViewHolder(holder: BookViewHolder, position: Int) {
         val book = books[position]
 
-        // Обложка
+        // обложка
         if (book.coverUri != null) {
             Glide.with(context)
                 .load(book.coverUri)
@@ -64,7 +64,7 @@ class BookAdapter(
         val popup = PopupMenu(context, view)
         popup.inflate(R.menu.book_context_menu)
 
-        // Если хочешь отдельный пункт "Удалить полностью" — раскомментируй в меню XML
+        // если хочешь отдельный пункт "Удалить полностью" — раскомментировать надо в xml
         // popup.menu.findItem(R.id.action_delete_permanently)?.isVisible = book.cloudSynced
 
         popup.setOnMenuItemClickListener { item ->
@@ -81,7 +81,7 @@ class BookAdapter(
                     showDeleteLocalDialog(book, position)
                     true
                 }
-                // Если добавишь в меню:
+                // если надо будет добавить в меню:
                 // R.id.action_delete_permanently -> { deleteBookEverywhere(book, position); true }
                 else -> false
             }
@@ -89,7 +89,7 @@ class BookAdapter(
         popup.show()
     }
 
-    // Удаление ТОЛЬКО с устройства (остаётся в облаке)
+    //  удаление только локально
     private fun showDeleteLocalDialog(book: Book, position: Int) {
         MaterialAlertDialogBuilder(context)
             .setTitle("Удалить с устройства?")
@@ -106,10 +106,10 @@ class BookAdapter(
             try {
                 val dao = AppDatabase.getDatabase(context).bookDao()
 
-                // 1. Удаляем из Room
+                // 1. удаляем из Room
                 dao.deleteById(book.id)
 
-                // 2. Удаляем обложку с диска
+                // 2. удаляем обложку с диска
                 book.coverUri?.let { uri ->
                     if (uri.scheme == "file") {
                         File(uri.path!!).takeIf { it.exists() }?.delete()
@@ -117,7 +117,7 @@ class BookAdapter(
                 }
 
                 withContext(Dispatchers.Main) {
-                    // Удаляем из списка и обновляем UI
+                    // удаляем из списка и обновляем UI
                     books.removeAt(position)
                     notifyItemRemoved(position)
                     notifyItemRangeChanged(position, books.size)
@@ -132,7 +132,7 @@ class BookAdapter(
         }
     }
 
-    // Удаление из облака и лоркально одновременно
+    // удаление из облака и лоркально одновременно
     // надо добавить в book_context_menu.xml пункт с id action_delete_permanently
     // пока убрал за ненадобностью
     /*

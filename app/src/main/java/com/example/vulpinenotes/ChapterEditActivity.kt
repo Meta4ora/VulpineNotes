@@ -38,7 +38,7 @@ class ChapterEditActivity : AppCompatActivity() {
         database = AppDatabase.getDatabase(this)
         firestore = FirebaseFirestore.getInstance()
         auth = FirebaseAuth.getInstance()
-// Получаем главу
+        // получаем главу
         chapter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(EXTRA_CHAPTER, Chapter::class.java)
         } else {
@@ -53,7 +53,7 @@ class ChapterEditActivity : AppCompatActivity() {
         binding.contentEditText.setText(chapter.description)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setHomeAsUpIndicator(R.drawable.ic_close)
-// Сохранение при нажатии "назад" или крестика
+        // сохранение при нажатии "назад" или крестика
         onBackPressedDispatcher.addCallback(this) { saveAndExit() }
     }
     override fun onSupportNavigateUp(): Boolean {
@@ -78,9 +78,9 @@ class ChapterEditActivity : AppCompatActivity() {
                 isFavorite = chapter.isFavorite,
                 updatedAt = System.currentTimeMillis()
             )
-// 1. Сохраняем локально (всегда)
+            // 1. сохраняем локально (всегда)
             database.chapterDao().insertChapter(entity)
-// 2. Отправляем в облако, если книга синхронизирована
+            // 2. отправляем в облако, если книга синхронизирована
             if (bookCloudSynced && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -94,14 +94,14 @@ class ChapterEditActivity : AppCompatActivity() {
                             .await()
                     }
                 } catch (e: Exception) {
-// Если нет интернета — не падаем, просто не синхронизировалось сейчас
+                    // если нет интернета — не крашемся, просто не синхронизировалось сейчас
                     e.printStackTrace()
                     runOnUiThread {
                         Toast.makeText(this@ChapterEditActivity, "Не удалось сохранить в облако (проверьте интернет)", Toast.LENGTH_LONG).show()
                     }
                 }
             }
-// Возвращаем обновлённую главу в BookActivity
+            // возвращаем обновлённую главу в BookActivity
             setResult(RESULT_UPDATED_CHAPTER, Intent().apply {
                 putExtra(EXTRA_CHAPTER, updatedChapter)
                 putExtra(EXTRA_CHAPTER_POSITION, position)

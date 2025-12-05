@@ -11,6 +11,5 @@ data class Chapter(
     val wordCount: Int = 0,
     var isFavorite: Boolean = false
 ) : Parcelable {
-    // ← ЭТОТ КОНСТРУКТОР РЕШИТ ВСЁ!
     constructor() : this("", "", "", 0, false)
 }

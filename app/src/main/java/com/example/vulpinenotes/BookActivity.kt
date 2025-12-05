@@ -43,7 +43,7 @@ class BookActivity : AppCompatActivity() {
     private lateinit var firestore: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
 
-    // Гарантированная отправка — корутина живёт дольше Activity!
+    // корутина, живущая дольше чем активность
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val editChapterLauncher = registerForActivityResult(
@@ -83,7 +83,7 @@ class BookActivity : AppCompatActivity() {
         setupFab()
         loadChaptersFromRoom()
 
-        // Просто выход — никаких "гарантированных" batch при закрытии
+        // обработка выхода без батча
         onBackPressedDispatcher.addCallback(this) {
             finish()
         }
@@ -92,7 +92,7 @@ class BookActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_menu, menu)
 
-        // Если книга НЕ синхронизируется с облаком — скрываем кнопку
+        // не синхронизированной книге не опказывать кнопку
         val syncItem = menu.findItem(R.id.action_sync)
         syncItem.isVisible = book.cloudSynced
 
@@ -184,7 +184,7 @@ class BookActivity : AppCompatActivity() {
                         )
                         database.chapterDao().insertChapter(newChapter)
 
-                        // ГАРАНТИРОВАННАЯ отправка — даже если сразу выйти
+                        // успешная отправка даже если активность закрыта
                         if (book.cloudSynced) {
                             uploadChapterToCloud(newChapter)
                         }
@@ -203,15 +203,15 @@ class BookActivity : AppCompatActivity() {
             .setMessage("«${chapter.title}» будет удалена безвозвратно.")
             .setPositiveButton("Удалить") { _, _ ->
                 lifecycleScope.launch {
-                    // Находим entity по позиции
+                    // находим entity по позиции
                     val entity = database.chapterDao()
                         .getChaptersForBookSync(book.id)
                         .find { it.position == position } ?: return@launch
 
-                    // Удаляем из Room
+                    // удаляем из Room
                     database.chapterDao().deleteChapter(entity)
 
-                    // Удаляем из Firestore
+                    // удаляем из Firestore
                     if (book.cloudSynced) {
                         backgroundScope.launch {
                             try {
@@ -331,7 +331,7 @@ class BookActivity : AppCompatActivity() {
     private fun uploadChapterToCloud(chapterEntity: ChapterEntity) {
         val user = auth.currentUser ?: return
 
-        // Преобразуем Entity → чистый Chapter (без Parcelable-шумов и лишних полей)
+        // преобразуем Entity - чистый Chapter (без Parcelable-шумов и лишних полей)
         val chapterForCloud = Chapter(
             title = chapterEntity.title,
             description = chapterEntity.description,
@@ -349,7 +349,7 @@ class BookActivity : AppCompatActivity() {
                     .document(chapterEntity.bookId)
                     .collection("chapters")
                     .document(chapterEntity.position.toString())
-                    .set(chapterForCloud)  // ← Теперь 100% корректно сериализуется!
+                    .set(chapterForCloud)
                     .await()
 
                 Log.d(TAG, "Глава «${chapterEntity.title}» синхронизирована в облако (избранное: ${chapterEntity.isFavorite})")
@@ -368,6 +368,6 @@ class BookActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // backgroundScope живёт дальше — главы всё равно дойдут!
+        // backgroundScope живёт дальше — главы всё равно будут синхронизированы
     }
 }
