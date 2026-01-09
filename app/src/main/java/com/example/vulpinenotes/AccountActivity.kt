@@ -69,8 +69,11 @@ class AccountActivity : AppCompatActivity() {
     private fun signOut() {
         auth.signOut()
         googleSignInClient.signOut()
-        updateUI(null)
+
+        setResult(RESULT_OK)
+        finish()
     }
+
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)

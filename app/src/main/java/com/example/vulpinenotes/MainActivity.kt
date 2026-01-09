@@ -49,7 +49,6 @@ class MainActivity : BaseActivity() {
     private lateinit var clearButton: ImageView
     private lateinit var menuButton: ImageView
     private lateinit var navView: NavigationView
-    // Диалог
     private var currentCoverPreview: ImageView? = null
     private var currentBtnAddCover: Button? = null
     private var selectedImageFile: File? = null
@@ -504,12 +503,17 @@ class MainActivity : BaseActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_ACCOUNT && resultCode == RESULT_OK) {
-            auth.currentUser?.let { user ->
-                syncAllFromCloud(user) // ← полная синхронизация после входа
+            if (auth.currentUser != null) {
+                syncAllFromCloud(auth.currentUser!!)
                 showAddBookButton()
-                updateNavHeader()
+            } else {
+                addBookButton.visibility = View.GONE
+                Toast.makeText(this, "Вы вышли из аккаунта", Toast.LENGTH_SHORT).show()
             }
+
+            updateNavHeader()
         }
+
         if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK) {
             recreate()
         }
