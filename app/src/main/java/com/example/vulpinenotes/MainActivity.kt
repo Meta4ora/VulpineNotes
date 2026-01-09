@@ -238,7 +238,7 @@ class MainActivity : BaseActivity() {
                 it.copyTo(dest, overwrite = true)
                 dest.absolutePath
             }
-            // создаём книгу ВСЕГДА с cloudSynced = false
+
             val bookEntity = BookEntity(
                 id = bookId,
                 title = title,
@@ -448,7 +448,7 @@ class MainActivity : BaseActivity() {
         v.findViewById<TextView>(R.id.dialogAuthor).text = book.desc.ifBlank { getString(R.string.unknown_desc) }
         val cover = v.findViewById<ImageView>(R.id.dialogCover)
         if (book.coverUri != null) {
-            Glide.with(this).load(book.coverUri).placeholder(R.drawable.book_cover_placeholder).into(cover)
+            Glide.with(this).load(book.coverUri).placeholder(R.drawable.book_vector_placeholder).into(cover)
             cover.visibility = View.VISIBLE
         } else cover.visibility = View.GONE
         MaterialAlertDialogBuilder(this, R.style.CustomAlertDialogTheme)

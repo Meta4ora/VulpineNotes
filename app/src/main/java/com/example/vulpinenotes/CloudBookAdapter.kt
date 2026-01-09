@@ -35,10 +35,10 @@ class CloudBookAdapter(
         if (book.coverUri != null) {
             Glide.with(holder.itemView.context)
                 .load(book.coverUri)
-                .placeholder(R.drawable.book_cover_placeholder)
+                .placeholder(R.drawable.book_vector_placeholder)
                 .into(holder.coverImage)
         } else {
-            holder.coverImage.setImageResource(R.drawable.book_cover_placeholder)
+            holder.coverImage.setImageResource(R.drawable.book_vector_placeholder)
         }
 
         holder.cloudButton.setImageResource(

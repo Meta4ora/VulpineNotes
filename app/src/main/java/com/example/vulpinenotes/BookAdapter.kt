@@ -13,8 +13,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.vulpinenotes.data.AppDatabase
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.*
 import java.io.File
 
@@ -46,11 +44,11 @@ class BookAdapter(
         if (book.coverUri != null) {
             Glide.with(context)
                 .load(book.coverUri)
-                .placeholder(R.drawable.book_cover_placeholder)
-                .error(R.drawable.book_cover_placeholder)
+                .placeholder(R.drawable.book_vector_placeholder)
+                .error(R.drawable.book_vector_placeholder)
                 .into(holder.cover)
         } else {
-            holder.cover.setImageResource(R.drawable.book_cover_placeholder)
+            holder.cover.setImageResource(R.drawable.book_vector_placeholder)
         }
 
         holder.title.text = book.title.ifBlank { "Без названия" }
