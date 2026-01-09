@@ -14,5 +14,6 @@ data class Book(
     val coverUri: Uri? = null,
     val chaptersCount: Int = 0,
     val updatedAt: Long = 0,
+    val createdAt: Long = System.currentTimeMillis(),
     val cloudSynced: Boolean = false
 ) : Parcelable

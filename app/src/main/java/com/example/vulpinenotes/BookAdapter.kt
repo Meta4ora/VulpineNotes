@@ -46,7 +46,10 @@ class BookAdapter(
                 .load(book.coverUri)
                 .placeholder(R.drawable.book_vector_placeholder)
                 .error(R.drawable.book_vector_placeholder)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE) // не использовать кэш на диске
+                .skipMemoryCache(true) // не использовать память
                 .into(holder.cover)
+
         } else {
             holder.cover.setImageResource(R.drawable.book_vector_placeholder)
         }
@@ -93,13 +96,13 @@ class BookAdapter(
             .setTitle("Удалить с устройства?")
             .setMessage("Книга «${book.title}» будет удалена только с этого телефона.\n\nВ облаке она останется доступна на других устройствах.")
             .setPositiveButton("Удалить") { _, _ ->
-                deleteBookLocally(book, position)
+                deleteBookLocally(book)
             }
             .setNegativeButton("Отмена", null)
             .show()
     }
 
-    private fun deleteBookLocally(book: Book, position: Int) {
+    private fun deleteBookLocally(book: Book) {
         (context as? MainActivity)?.lifecycleScope?.launch(Dispatchers.IO) {
             try {
                 val dao = AppDatabase.getDatabase(context).bookDao()
@@ -115,13 +118,14 @@ class BookAdapter(
                 }
 
                 withContext(Dispatchers.Main) {
-                    // удаляем из списка и обновляем UI
-                    books.removeAt(position)
-                    notifyItemRemoved(position)
-                    notifyItemRangeChanged(position, books.size)
-
+                    val index = books.indexOfFirst { it.id == book.id }
+                    if (index != -1) {
+                        books.removeAt(index)
+                        notifyItemRemoved(index)
+                    }
                     Toast.makeText(context, "Книга удалена с устройства", Toast.LENGTH_SHORT).show()
                 }
+
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Ошибка при удалении", Toast.LENGTH_SHORT).show()
@@ -129,6 +133,7 @@ class BookAdapter(
             }
         }
     }
+
 
     // удаление из облака и лоркально одновременно
     // надо добавить в book_context_menu.xml пункт с id action_delete_permanently

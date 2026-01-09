@@ -10,6 +10,7 @@
     <string name="dark_button">Темная</string>
     <string name="system_button">Система</string>
     <string name="light_button">Светлая</string>
+    <string name="other_text">Другое</string>
 
     <!-- Главный экран -->
     <string name="search_bar">Поиск</string>

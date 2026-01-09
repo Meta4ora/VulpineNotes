@@ -22,6 +22,7 @@ import com.bumptech.glide.Glide
 import com.example.vulpinenotes.data.AppDatabase
 import com.example.vulpinenotes.data.BookEntity
 import com.example.vulpinenotes.data.ChapterEntity
+import com.example.vulpinenotes.data.SortType
 import com.example.vulpinenotes.data.toBook
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.imageview.ShapeableImageView
@@ -42,6 +43,7 @@ class MainActivity : BaseActivity() {
     // UI
     private lateinit var booksRecyclerView: RecyclerView
     private lateinit var bookAdapter: BookAdapter
+    private var currentSortType = SortType.TITLE
     private val books = mutableListOf<Book>()
     private lateinit var addBookButton: ImageButton
     private lateinit var drawerLayout: DrawerLayout
@@ -94,7 +96,16 @@ class MainActivity : BaseActivity() {
         if (auth.currentUser != null) {
             showAddBookButton()
             updateNavHeader()
-            syncAllFromCloud(auth.currentUser!!) // ← важная строчка!
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val autoSync = prefs.getBoolean("auto_sync", true)
+
+            if (auth.currentUser != null) {
+                showAddBookButton()
+                updateNavHeader()
+                if (autoSync) {
+                    syncAllFromCloud(auth.currentUser!!)
+                }
+            }
         } else {
             showAuthRequired()
             updateNavHeader()
@@ -108,6 +119,9 @@ class MainActivity : BaseActivity() {
         navView = findViewById(R.id.nav_view)
         addBookButton = findViewById(R.id.add_button)
         booksRecyclerView = findViewById(R.id.books_recycler_view)
+        findViewById<com.google.android.material.chip.Chip>(R.id.filter_chip)
+            .setOnClickListener { showFilterMenu(it) }
+
     }
     private fun copyUriToCache(uri: Uri): File? {
         return try {
@@ -200,7 +214,14 @@ class MainActivity : BaseActivity() {
         editDesc.setText(book.desc)
         selectedImageFile = null
         if (book.coverUri != null) {
-            Glide.with(this).load(book.coverUri).into(currentCoverPreview!!)
+            Glide.with(this)
+                .load(book.coverUri)
+                .placeholder(R.drawable.book_vector_placeholder)
+                .error(R.drawable.book_vector_placeholder)
+                .skipMemoryCache(true) // игнорируем память
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE) // игнорируем кэш на диске
+                .into(currentCoverPreview!!)
+
             currentCoverPreview?.visibility = View.VISIBLE
             currentBtnAddCover?.setText("Изменить обложку")
         } else {
@@ -244,11 +265,13 @@ class MainActivity : BaseActivity() {
                 title = title,
                 desc = desc,
                 coverPath = coverPath,
+                createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis(),
                 cloudSynced = false
             )
             database.bookDao().insertBook(bookEntity)
-            // если пользователь хочет синхронизацию — пытаемся залить
+
+            // синхронизация с облаком без полей coverPath и cloudSynced
             if (uploadToCloud && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -260,10 +283,10 @@ class MainActivity : BaseActivity() {
                                 "title" to title,
                                 "desc" to desc,
                                 "chaptersCount" to 0,
-                                "updatedAt" to System.currentTimeMillis()
+                                "createdAt" to bookEntity.createdAt,
+                                "updatedAt" to bookEntity.updatedAt
                             )).await()
                     }
-                    // Только после успешной заливки — ставим флаг
                     database.bookDao().updateCloudState(bookId, true)
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "Книга добавлена и синхронизирована", Toast.LENGTH_SHORT).show()
@@ -282,19 +305,25 @@ class MainActivity : BaseActivity() {
     private fun updateBookLocally(bookId: String, newTitle: String, newDesc: String, newCoverFile: File?) {
         lifecycleScope.launch {
             val currentBook = database.bookDao().getBookById(bookId) ?: return@launch
+
             val finalCoverPath = newCoverFile?.let {
-                val destFile = File(coversDir, "cover_$bookId.jpg")
+                val destFile = File(coversDir, "cover_$bookId.jpg") // всегда одно имя на книгу
+                if (destFile.exists()) destFile.delete()           // удаляем старый файл
                 it.copyTo(destFile, overwrite = true)
                 destFile.absolutePath
             } ?: currentBook.coverPath
+
+
             val updatedBook = currentBook.copy(
                 title = newTitle,
                 desc = newDesc,
                 coverPath = finalCoverPath,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = System.currentTimeMillis()  // обновляем только updatedAt
             )
-            database.bookDao().insertBook(updatedBook)
-            // если книга была синхронизирована — обновляем в облаке
+
+            database.bookDao().insertBook(updatedBook) // заменяем существующую запись
+
+            // если синхронизировано с облаком
             if (currentBook.cloudSynced && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -305,16 +334,18 @@ class MainActivity : BaseActivity() {
                             .update(mapOf(
                                 "title" to newTitle,
                                 "desc" to newDesc,
-                                "updatedAt" to System.currentTimeMillis()
+                                "updatedAt" to updatedBook.updatedAt
                             )).await()
                     }
                 } catch (e: Exception) {
                     Log.e("SYNC", "Не удалось обновить книгу в облаке", e)
                 }
             }
+
             Toast.makeText(this@MainActivity, "Книга обновлена", Toast.LENGTH_SHORT).show()
         }
     }
+
     private suspend fun uploadAllChaptersForBook(bookId: String, user: FirebaseUser) {
         val isSynced = withContext(Dispatchers.IO) {
             database.bookDao().getBookById(bookId)?.cloudSynced == true
@@ -444,19 +475,95 @@ class MainActivity : BaseActivity() {
     }
     private fun showBookInfo(book: Book) {
         val v = layoutInflater.inflate(R.layout.dialog_book_info, null)
-        v.findViewById<TextView>(R.id.dialogTitle).text = book.title
-        v.findViewById<TextView>(R.id.dialogAuthor).text = book.desc.ifBlank { getString(R.string.unknown_desc) }
+
+        // обложка
         val cover = v.findViewById<ImageView>(R.id.dialogCover)
         if (book.coverUri != null) {
-            Glide.with(this).load(book.coverUri).placeholder(R.drawable.book_vector_placeholder).into(cover)
+            Glide.with(this)
+                .load(book.coverUri)
+                .placeholder(R.drawable.book_vector_placeholder)
+                .error(R.drawable.book_vector_placeholder)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
+                .skipMemoryCache(true)
+                .into(cover)
+
             cover.visibility = View.VISIBLE
         } else cover.visibility = View.GONE
+
+        // Название и описание
+        v.findViewById<TextView>(R.id.dialogTitle).text = book.title.ifBlank { "Без названия" }
+        v.findViewById<TextView>(R.id.dialogAuthor).text = book.desc.ifBlank { getString(R.string.unknown_desc) }
+
+        // Количество глав
+        v.findViewById<TextView>(R.id.dialogChaptersCount)?.text =
+            "Количество глав: ${book.chaptersCount}"
+
+        // Дата создания и обновления
+        val dateFormat = java.text.DateFormat.getDateTimeInstance()
+        v.findViewById<TextView>(R.id.dialogCreatedAt)?.text =
+            "Создано: ${dateFormat.format(book.createdAt)}"
+        v.findViewById<TextView>(R.id.dialogUpdatedAt)?.text =
+            "Обновлено: ${dateFormat.format(book.updatedAt)}"
+
+        // Статус синхронизации
+        v.findViewById<TextView>(R.id.dialogCloudSynced)?.text =
+            "Синхронизировано: ${if (book.cloudSynced) "Да" else "Нет"}"
+
+        // Показываем диалог
         MaterialAlertDialogBuilder(this, R.style.CustomAlertDialogTheme)
             .setTitle(R.string.info)
             .setView(v)
             .setPositiveButton("OK") { d, _ -> d.dismiss() }
             .show()
     }
+
+
+    private fun showFilterMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.inflate(R.menu.filter_menu)
+
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.sort_title -> {
+                    currentSortType = SortType.TITLE
+                    updateFilterChip("Название")
+                }
+                R.id.sort_updated -> {
+                    currentSortType = SortType.UPDATED_AT
+                    updateFilterChip("Дата изменения")
+                }
+                R.id.sort_created -> {
+                    currentSortType = SortType.CREATED_AT
+                    updateFilterChip("Дата создания")
+                }
+            }
+            sortBooks()
+            true
+        }
+
+        popup.show()
+    }
+
+    private fun updateFilterChip(text: String) {
+        val chip = findViewById<com.google.android.material.chip.Chip>(R.id.filter_chip)
+        chip.text = text
+    }
+
+    private fun sortBooks() {
+        when (currentSortType) {
+            SortType.TITLE -> {
+                books.sortBy { it.title.lowercase(Locale.getDefault()) }
+            }
+            SortType.UPDATED_AT -> {
+                books.sortByDescending { it.updatedAt }
+            }
+            SortType.CREATED_AT -> {
+                books.sortByDescending { it.createdAt }
+            }
+        }
+        bookAdapter.notifyDataSetChanged()
+    }
+
     private fun setupDrawer() {
         menuButton.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
         navView.setNavigationItemSelectedListener { item ->
@@ -516,7 +623,15 @@ class MainActivity : BaseActivity() {
 
         if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK) {
             recreate()
+
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val autoSync = prefs.getBoolean("auto_sync", true)
+
+            if (auth.currentUser != null && autoSync) {
+                syncAllFromCloud(auth.currentUser!!)
+            }
         }
+
     }
     private fun updateNavHeader() {
         val headerView = navView.getHeaderView(0)

@@ -10,6 +10,7 @@
     <string name="dark_button">Dark</string>
     <string name="system_button">System</string>
     <string name="light_button">Light</string>
+    <string name="other_text">Other</string>
 
     <!-- Main Screen -->
     <string name="search_bar">Search</string>

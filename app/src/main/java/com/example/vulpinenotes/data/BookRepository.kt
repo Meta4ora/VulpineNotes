@@ -68,11 +68,18 @@ class BookRepository(
         return coverFile.absolutePath
     }
     suspend fun updateBook(book: BookEntity) {
-        bookDao.insertBook(book.copy(updatedAt = System.currentTimeMillis()))
+        val updatedBook = book.copy(
+            updatedAt = System.currentTimeMillis(),
+            createdAt = book.createdAt
+        )
+        bookDao.updateBook(updatedBook)
+
         FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
-            syncBookToCloud(book.copy(cloudSynced = false), uid)
+            syncBookToCloud(updatedBook, uid)
         }
     }
+
+
     suspend fun deleteBook(bookId: String) {
         bookDao.deleteById(bookId)
         chapterDao.deleteChaptersForBook(bookId)

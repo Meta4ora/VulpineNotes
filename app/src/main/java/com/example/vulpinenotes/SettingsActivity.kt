@@ -7,12 +7,17 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.switchmaterial.SwitchMaterial
 
 class SettingsActivity : BaseActivity() {
 
     private val PREFS_NAME = "app_prefs"
     private val KEY_LANGUAGE = "app_language"
     private val KEY_THEME = "app_theme"
+
+    private val KEY_AUTO_SYNC = "auto_sync"
+
+    private lateinit var autoSyncSwitch: SwitchMaterial
 
     private lateinit var languageSpinner: AutoCompleteTextView
     private lateinit var languages: List<Language>
@@ -27,6 +32,7 @@ class SettingsActivity : BaseActivity() {
         setupToolbar()
         setupThemeSwitcher()
         setupLanguageSpinner()
+        setupAutoSyncSwitch()
         setupBackPressHandler()
     }
 
@@ -106,6 +112,20 @@ class SettingsActivity : BaseActivity() {
             .edit()
             .putString(KEY_LANGUAGE, code)
             .apply()
+    }
+
+    private fun setupAutoSyncSwitch() {
+        autoSyncSwitch = findViewById(R.id.switch_auto_sync)
+        val isAutoSync = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_AUTO_SYNC, true)
+        autoSyncSwitch.isChecked = isAutoSync
+
+        autoSyncSwitch.setOnCheckedChangeListener { _, isChecked ->
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_AUTO_SYNC, isChecked)
+                .apply()
+        }
     }
 
     private fun getSavedLanguage(): String {
