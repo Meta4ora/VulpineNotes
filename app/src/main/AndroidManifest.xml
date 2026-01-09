@@ -23,7 +23,7 @@
             android:exported="false" />
         <activity
             android:name=".AccountActivity"
-            android:exported="false" />
+            android:exported="false"/>
         <activity
             android:name=".BookActivity"
             android:exported="false" />

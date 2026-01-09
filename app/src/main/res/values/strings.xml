@@ -11,6 +11,7 @@
     <string name="system_button">Система</string>
     <string name="light_button">Светлая</string>
     <string name="other_text">Другое</string>
+    <string name="autosync">Автосинхронизация книг</string>
 
     <!-- Главный экран -->
     <string name="search_bar">Поиск</string>
@@ -20,6 +21,8 @@
     <string name="help">Помощь</string>
     <string name="addition">Дополнительно</string>
     <string name="sync">Синхронизация</string>
+    <string name="name_def">Гость</string>
+    <string name="name_tip">Нажмите, чтобы войти</string>
 
 
     <!-- Добавление книги -->
@@ -59,6 +62,23 @@
     <string name="export">Экспортировать</string>
     <string name="export_started">Экспорт книги...</string>
     <string name="default_web_client_id">59321474403-kst2avv2kub814kcpd6dgrbt846n9uvs.apps.googleusercontent.com</string>
+
+    <!-- Аккаунт -->
+    <string name="check_login">Вы не авторизованы</string>
+    <string name="login">Войти через Google</string>
+    <string name="logout">Выйти</string>
+    <string name="account_title">Аккаунт</string>
+
+    <!-- Фильтры -->
+    <string name="by_name">Название</string>
+    <string name="by_create_date">Дата создания</string>
+    <string name="by_edit_date">Дата изменения</string>
+
+    <!-- Помощь -->
+    <string name="contact_tip">Свяжитесь с нами:</string>
+    <string name="version">Версия приложения: 0.1.1</string>
+    <string name="title_help">Помощь</string>
+
 
 
 </resources>

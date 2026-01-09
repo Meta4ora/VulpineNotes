@@ -111,7 +111,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginTop="8dp"
-            android:text="Название"
+            android:text=""
             android:textColor="?attr/colorOnPrimary"
             app:chipBackgroundColor="?attr/colorPrimary"
             app:chipCornerRadius="20dp"

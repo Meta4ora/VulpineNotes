@@ -27,7 +27,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:text="Гость"
+        android:text="@string/name_tip"
         android:textColor="@android:color/white"
         android:textSize="18sp"
         android:textStyle="bold" />
@@ -37,7 +37,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="Нажмите, чтобы войти"
+        android:text="@string/name_tip"
         android:textColor="@android:color/white"
         android:textSize="14sp"
         android:alpha="0.9" />

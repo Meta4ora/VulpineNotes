@@ -45,6 +45,7 @@ class MainActivity : BaseActivity() {
     private lateinit var bookAdapter: BookAdapter
     private var currentSortType = SortType.TITLE
     private val books = mutableListOf<Book>()
+    private val allBooks = mutableListOf<Book>()
     private lateinit var addBookButton: ImageButton
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var searchEditText: EditText
@@ -148,11 +149,52 @@ class MainActivity : BaseActivity() {
     private fun observeLocalBooks() {
         lifecycleScope.launch {
             database.bookDao().getAllBooks().collect { bookEntities ->
+                allBooks.clear()
+                allBooks.addAll(bookEntities.map { it.toBook(coversDir) })
+
                 books.clear()
-                books.addAll(bookEntities.map { it.toBook(coversDir) })
+                books.addAll(allBooks)
                 bookAdapter.notifyDataSetChanged()
+                sortBooks()
+                updateFilterChip(getString(R.string.by_name))
             }
         }
+    }
+
+    private fun setupSearch() {
+        searchEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                clearButton.visibility = if (s.isNullOrBlank()) View.GONE else View.VISIBLE
+                filterBooks(s.toString())
+            }
+
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        clearButton.setOnClickListener {
+            searchEditText.text.clear()
+            searchEditText.clearFocus()
+            filterBooks("") // сброс фильтра
+        }
+    }
+
+    private fun filterBooks(query: String) {
+        val lowerQuery = query.lowercase(Locale.getDefault())
+        books.clear()
+        if (lowerQuery.isEmpty()) {
+            books.addAll(allBooks)
+        } else {
+            books.addAll(
+                allBooks.filter { book ->
+                    book.title.lowercase(Locale.getDefault()).contains(lowerQuery) ||
+                            book.desc.lowercase(Locale.getDefault()).contains(lowerQuery)
+                }
+            )
+        }
+        sortBooks()
+        bookAdapter.notifyDataSetChanged()
     }
     private fun showAuthRequired() {
         MaterialAlertDialogBuilder(this)
@@ -526,15 +568,15 @@ class MainActivity : BaseActivity() {
             when (item.itemId) {
                 R.id.sort_title -> {
                     currentSortType = SortType.TITLE
-                    updateFilterChip("Название")
+                    updateFilterChip(getString(R.string.by_name))
                 }
                 R.id.sort_updated -> {
                     currentSortType = SortType.UPDATED_AT
-                    updateFilterChip("Дата изменения")
+                    updateFilterChip(getString(R.string.by_edit_date))
                 }
                 R.id.sort_created -> {
                     currentSortType = SortType.CREATED_AT
-                    updateFilterChip("Дата создания")
+                    updateFilterChip(getString(R.string.by_create_date))
                 }
             }
             sortBooks()
@@ -583,19 +625,7 @@ class MainActivity : BaseActivity() {
             true
         }
     }
-    private fun setupSearch() {
-        searchEditText.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                clearButton.visibility = if (s.isNullOrBlank()) View.GONE else View.VISIBLE
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
-        clearButton.setOnClickListener {
-            searchEditText.text.clear()
-            searchEditText.clearFocus()
-        }
-    }
+
     private fun setupBackPress() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -649,8 +679,8 @@ class MainActivity : BaseActivity() {
                 startActivity(Intent(this, AccountActivity::class.java))
             }
         } else {
-            name.text = "Гость"
-            email.text = "Нажмите, чтобы войти"
+            name.text = getString(R.string.name_def)
+            email.text = getString(R.string.name_tip)
             avatar.setImageResource(R.drawable.ic_fox_logo)
             headerView.setOnClickListener {
                 drawerLayout.closeDrawer(GravityCompat.START)

@@ -3,14 +3,14 @@
 
     <item
         android:id="@+id/sort_title"
-        android:title="Название"/>
+        android:title="@string/by_name"/>
 
     <item
         android:id="@+id/sort_updated"
-        android:title="Дата изменения"/>
+        android:title="@string/by_edit_date"/>
 
     <item
         android:id="@+id/sort_created"
-        android:title="Дата создания"/>
+        android:title="@string/by_create_date"/>
 
 </menu>

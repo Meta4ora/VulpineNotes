@@ -15,7 +15,7 @@
     </group>
 
     <item
-        android:title="Дополнительно">
+        android:title="@string/addition">
         <menu>
             <item
                 android:id="@+id/nav_settings"
