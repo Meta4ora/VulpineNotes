@@ -354,9 +354,9 @@ class MainActivity : BaseActivity() {
 
             val cloudChapters = snapshot.documents.mapNotNull { doc ->
                 val chapter = doc.toObject(Chapter::class.java) ?: return@mapNotNull null
-                // Преобразуем в Entity с правильным bookId!
+                // преобразуем в Entity с правильным bookId!
                 ChapterEntity(
-                    bookId = bookId,                    // ← ВОТ ЭТО КЛЮЧЕВОЕ!
+                    bookId = bookId,
                     position = doc.id.toInt(),
                     title = chapter.title,
                     description = chapter.description,
