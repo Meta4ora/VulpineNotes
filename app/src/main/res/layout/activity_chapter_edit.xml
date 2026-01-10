@@ -31,7 +31,8 @@
                 android:layout_height="56dp"
                 app:navigationIcon="@drawable/ic_close"
                 android:paddingStart="16dp"
-                android:paddingEnd="16dp">
+                android:paddingEnd="16dp"
+                style="@style/Widget.MaterialComponents.Toolbar.Primary">
 
                 <TextView
                     android:id="@+id/chapterTitleTextView"

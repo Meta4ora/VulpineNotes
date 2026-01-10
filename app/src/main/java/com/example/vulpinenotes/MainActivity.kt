@@ -77,6 +77,7 @@ class MainActivity : BaseActivity() {
         db = FirebaseFirestore.getInstance()
         database = AppDatabase.getDatabase(this)
         coversDir = File(filesDir, "covers").apply { mkdirs() }
+
         pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let { copyUriToCache(it) }?.let { file ->
                 selectedImageFile = file
@@ -87,29 +88,27 @@ class MainActivity : BaseActivity() {
                 currentBtnAddCover?.setText("Изменить обложку")
             }
         }
+
         initViews()
         setupRecyclerView()
         setupDrawer()
         setupSearch()
         setupBackPress()
         observeLocalBooks()
-        // при запуске проверяем авторизацию
+
+        // Всегда показываем кнопку добавления книги
+        showAddBookButton()
+
+        // Обновляем навигацию
+        updateNavHeader()
+
+        // Проверяем авторизацию только для синхронизации
         if (auth.currentUser != null) {
-            showAddBookButton()
-            updateNavHeader()
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val autoSync = prefs.getBoolean("auto_sync", true)
-
-            if (auth.currentUser != null) {
-                showAddBookButton()
-                updateNavHeader()
-                if (autoSync) {
-                    syncAllFromCloud(auth.currentUser!!)
-                }
+            if (autoSync) {
+                syncAllFromCloud(auth.currentUser!!)
             }
-        } else {
-            showAuthRequired()
-            updateNavHeader()
         }
     }
     private fun initViews() {
@@ -146,6 +145,7 @@ class MainActivity : BaseActivity() {
             }
         } else uri.lastPathSegment
     }
+
     private fun observeLocalBooks() {
         lifecycleScope.launch {
             database.bookDao().getAllBooks().collect { bookEntities ->
@@ -209,16 +209,20 @@ class MainActivity : BaseActivity() {
         bookAdapter.notifyDataSetChanged()
     }
     private fun showAuthRequired() {
+        // Для неавторизованных пользователей всё равно показываем кнопку добавления
+        addBookButton.visibility = View.VISIBLE
+        addBookButton.setOnClickListener { showAddDialog() }
+
+        // Показываем информационное сообщение о возможностях
         MaterialAlertDialogBuilder(this)
-            .setTitle("Требуется вход")
-            .setMessage("Войдите через Google, чтобы синхронизировать книги в облако.")
+            .setTitle("Локальный режим")
+            .setMessage("Вы можете создавать книги локально. Для синхронизации с облаком войдите через Google.")
             .setPositiveButton("Войти") { _, _ ->
                 startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
             }
-            .setNegativeButton("Позже") { d, _ -> d.dismiss() }
-            .setCancelable(false)
+            .setNegativeButton("Продолжить локально") { d, _ -> d.dismiss() }
+            .setCancelable(true)
             .show()
-        addBookButton.visibility = View.GONE
     }
     private fun showAddBookButton() {
         addBookButton.visibility = View.VISIBLE
@@ -234,10 +238,21 @@ class MainActivity : BaseActivity() {
         selectedImageFile = null
         currentCoverPreview?.visibility = View.GONE
         currentBtnAddCover?.setText("Добавить обложку")
-        switchUpload?.isChecked = true
+
+        // Управление видимостью switch для облака
+        if (auth.currentUser != null) {
+            // Пользователь авторизован - показываем switch
+            switchUpload?.visibility = View.VISIBLE
+            switchUpload?.isChecked = true
+        } else {
+            // Пользователь не авторизован - скрываем switch
+            switchUpload?.visibility = View.GONE
+        }
+
         currentBtnAddCover?.setOnClickListener {
             pickImageLauncher.launch("image/*")
         }
+
         MaterialAlertDialogBuilder(this)
             .setTitle("Новая книга")
             .setView(view)
@@ -248,11 +263,15 @@ class MainActivity : BaseActivity() {
                     Toast.makeText(this, "Введите название или описание", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
+
+                // Для неавторизованных пользователей всегда uploadToCloud = false
+                val uploadToCloud = auth.currentUser != null && switchUpload?.isChecked == true
+
                 addBookLocally(
                     title = title.ifBlank { "Без названия" },
                     desc = desc.ifBlank { "Нет описания" },
                     coverFile = selectedImageFile,
-                    uploadToCloud = switchUpload?.isChecked == true
+                    uploadToCloud = uploadToCloud
                 )
             }
             .setNegativeButton("Отмена", null)
@@ -321,11 +340,11 @@ class MainActivity : BaseActivity() {
                 coverPath = coverPath,
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis(),
-                cloudSynced = false
+                cloudSynced = false // Для неавторизованных всегда false
             )
             database.bookDao().insertBook(bookEntity)
 
-            // синхронизация с облаком без полей coverPath и cloudSynced
+            // Синхронизация с облаком только для авторизованных пользователей
             if (uploadToCloud && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -352,7 +371,12 @@ class MainActivity : BaseActivity() {
                     Log.e("SYNC", "Не удалось синхронизировать при создании", e)
                 }
             } else {
-                Toast.makeText(this@MainActivity, "Книга добавлена локально", Toast.LENGTH_SHORT).show()
+                val message = if (auth.currentUser == null) {
+                    "Книга добавлена локально (неавторизованный режим)"
+                } else {
+                    "Книга добавлена локально"
+                }
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -698,25 +722,24 @@ class MainActivity : BaseActivity() {
         val name = headerView.findViewById<TextView>(R.id.nav_header_name)
         val email = headerView.findViewById<TextView>(R.id.nav_header_email)
         val user = auth.currentUser
+
         if (user != null) {
             name.text = user.displayName ?: "Пользователь"
             email.text = user.email ?: ""
             user.photoUrl?.let { Glide.with(this).load(it).placeholder(R.drawable.ic_fox_logo).into(avatar) }
                 ?: avatar.setImageResource(R.drawable.ic_fox_logo)
-            headerView.setOnClickListener {
-                drawerLayout.closeDrawer(GravityCompat.START)
-                startActivity(Intent(this, AccountActivity::class.java))
-            }
         } else {
-            name.text = getString(R.string.name_def)
-            email.text = getString(R.string.name_tip)
+            name.text = "Локальный режим"
+            email.text = "Войдите для синхронизации"
             avatar.setImageResource(R.drawable.ic_fox_logo)
-            headerView.setOnClickListener {
-                drawerLayout.closeDrawer(GravityCompat.START)
-                startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
-            }
+        }
+
+        headerView.setOnClickListener {
+            drawerLayout.closeDrawer(GravityCompat.START)
+            startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
         }
     }
+
     private fun applySavedTheme() {
         val mode = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
