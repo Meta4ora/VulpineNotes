@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [BookEntity::class, ChapterEntity::class],
-    version = 3,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -57,6 +57,65 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // создаём новую таблицу
+                db.execSQL("""
+            CREATE TABLE chapters_new (
+                chapterId TEXT NOT NULL PRIMARY KEY,
+                bookId TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                date TEXT NOT NULL DEFAULT 'undefined',
+                wordCount INTEGER NOT NULL DEFAULT 0,
+                isFavorite INTEGER NOT NULL DEFAULT 0,
+                createdAt INTEGER NOT NULL DEFAULT 0,
+                updatedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """.trimIndent())
+
+                // переносим данные, создавая createdAt/updatedAt заново
+                db.execSQL("""
+            INSERT INTO chapters_new (
+                chapterId, bookId, position,
+                title, description, date,
+                wordCount, isFavorite,
+                createdAt, updatedAt
+            )
+            SELECT
+                lower(hex(randomblob(16))), -- новый chapterId
+                bookId,
+                position,
+                title,
+                description,
+                date,
+                IFNULL(wordCount, 0),
+                IFNULL(isFavorite, 0),
+                strftime('%s','now')*1000,   -- создаём createdAt
+                strftime('%s','now')*1000    -- создаём updatedAt
+            FROM chapters
+        """.trimIndent())
+
+                // удаляем старую таблицу
+                db.execSQL("DROP TABLE chapters")
+                db.execSQL("ALTER TABLE chapters_new RENAME TO chapters")
+
+                // создаём индексы
+                db.execSQL("CREATE INDEX index_chapters_position ON chapters(position)")
+                db.execSQL("CREATE INDEX index_chapters_bookId ON chapters(bookId)")
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+            ALTER TABLE chapters
+            ADD COLUMN content TEXT NOT NULL DEFAULT ''
+        """.trimIndent())
+            }
+        }
+
 
 
         fun getDatabase(context: Context): AppDatabase {
@@ -66,7 +125,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "vulpine_notes_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
 
                 INSTANCE = instance

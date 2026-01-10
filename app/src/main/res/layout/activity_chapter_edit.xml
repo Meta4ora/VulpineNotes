@@ -2,140 +2,196 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    tools:context=".ChapterEditActivity">
+    android:background="?attr/colorSurface"
+    android:fitsSystemWindows="true">
 
+    <!-- AppBar -->
     <com.google.android.material.appbar.AppBarLayout
-        android:layout_margin="8dp"
         android:id="@+id/appbar"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="@drawable/bg_button"
-        android:elevation="4dp">
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:elevation="0dp">
 
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:title="Редактировать главу"
-            app:navigationIcon="@drawable/ic_close"
-            app:navigationContentDescription="Закрыть"
-            app:titleTextColor="?attr/colorOnSurface" />
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            android:background="@drawable/bg_button">
+
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                app:navigationIcon="@drawable/ic_close"
+                app:navigationContentDescription="Назад"
+                app:title="Редактировать главу"
+                app:titleTextColor="?attr/colorOnPrimary"
+                app:titleTextAppearance="@style/TextAppearance.Material3.TitleMedium"
+                style="@style/Widget.MaterialComponents.Toolbar.Primary"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"/>
+        </androidx.cardview.widget.CardView>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/formatting_bar"
+    <!-- Текстовая область -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginHorizontal="8dp"
-        android:layout_marginTop="16dp"
-        app:layout_anchor="@id/appbar"
-        app:layout_anchorGravity="bottom"
-        app:cardElevation="2dp"
-        app:cardCornerRadius="16dp"
-        app:cardBackgroundColor="?attr/colorPrimaryContainer"
-        app:strokeWidth="0dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="match_parent"
+        android:layout_marginBottom="80dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        android:paddingTop="8dp">
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/contentEditText"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="top|start"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="16dp"
+        android:textSize="16sp"
+        android:lineSpacingMultiplier="1.5"
+        android:inputType="textMultiLine|textCapSentences"
+        android:background="@android:color/transparent"
+        android:hint="Начните писать..."
+        android:textColor="?attr/colorOnSurface"
+        android:textColorHint="?attr/colorOutline"/>
+
+    <TextView
+        android:id="@+id/previewTextView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="16dp"
+        android:textSize="16sp"
+        android:textColor="?attr/colorOnSurface"
+        android:lineSpacingMultiplier="1.5"
+        android:background="?attr/colorSurface"
+        android:visibility="gone"/>
+</FrameLayout>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/formattingBar"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="16dp"
+        app:cardCornerRadius="36dp"
+        app:cardElevation="8dp"
+        app:cardBackgroundColor="?attr/colorPrimary">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingHorizontal="8dp"
-            android:weightSum="8">
+            android:paddingHorizontal="8dp">
 
-            <ImageButton
-                android:id="@+id/btn_bold"
+            <!-- Прокручиваемая часть: все кнопки форматирования -->
+            <HorizontalScrollView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:srcCompat="@drawable/ic_format_bold"
-                android:contentDescription="Жирный"/>
+                android:scrollbars="none">
 
-            <ImageButton
-                android:id="@+id/btn_italic"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:srcCompat="@drawable/ic_format_italic"
-                android:contentDescription="Курсив"/>
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-            <ImageButton
-                android:id="@+id/btn_underline"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:srcCompat="@drawable/ic_format_underlined"
-                android:contentDescription="Подчёркивание"/>
+                    <!-- Жирный -->
+                    <ImageButton
+                        android:id="@+id/btnBold"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_bold"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="Жирный"
+                        android:layout_marginHorizontal="4dp"/>
 
+                    <!-- Курсив -->
+                    <ImageButton
+                        android:id="@+id/btnItalic"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_italic"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="Курсив"
+                        android:layout_marginHorizontal="4dp"/>
+
+                    <!-- Подчёркивание -->
+                    <ImageButton
+                        android:id="@+id/btnUnderline"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_underlined"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="Подчёркивание"
+                        android:layout_marginHorizontal="4dp"/>
+
+                    <!-- H3 -->
+                    <ImageButton
+                        android:id="@+id/btnH3"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_h3"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="H3"
+                        android:layout_marginHorizontal="4dp"/>
+
+                    <!-- Маркированный список -->
+                    <ImageButton
+                        android:id="@+id/btnBulletList"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_list_bulleted"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="Список"
+                        android:layout_marginHorizontal="4dp"/>
+
+
+                    <!-- Цитата -->
+                    <ImageButton
+                        android:id="@+id/btnQuote"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_quote"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="Цитата"
+                        android:layout_marginHorizontal="4dp"/>
+
+                </LinearLayout>
+            </HorizontalScrollView>
+
+            <!-- Фиксированная часть справа: разделитель + Предпросмотр -->
             <View
                 android:layout_width="1dp"
-                android:layout_height="24dp"
-                android:layout_marginHorizontal="4dp"
-                android:background="?attr/colorOutlineVariant" />
+                android:layout_height="40dp"
+                android:layout_marginHorizontal="12dp"/>
 
-            <ImageButton
-                android:id="@+id/btn_align_left"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:srcCompat="@drawable/ic_format_align_left"
-                android:contentDescription="По левому краю"/>
-
-            <ImageButton
-                android:id="@+id/btn_align_center"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:srcCompat="@drawable/ic_format_align_center"
-                android:contentDescription="По центру"/>
-
-            <ImageButton
-                android:id="@+id/btn_align_right"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:srcCompat="@drawable/ic_format_align_right"
-                android:contentDescription="По правому краю"/>
-
-            <ImageButton
-                android:id="@+id/btn_justify"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:srcCompat="@drawable/ic_format_align_justify"
-                android:contentDescription="По ширине"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/previewButton"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:text="Предпросмотр"
+                android:textSize="14sp"
+                android:textColor="?attr/colorOnPrimary"
+                android:paddingHorizontal="20dp"
+                style="@style/Widget.Material3.Button.TextButton"/>
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <EditText
-        android:id="@+id/content_edit_text"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="100dp"
-        android:gravity="top|start"
-        android:padding="18dp"
-        android:textSize="16sp"
-        android:lineSpacingMultiplier="1.4"
-        android:inputType="textMultiLine|textCapSentences"
-        android:background="@android:color/transparent"
-        android:hint="Начните писать..."
-        android:textColor="?attr/colorOnSurface"
-        android:textColorHint="?attr/colorOutline"
-        android:importantForAutofill="yes"
-        android:clipToPadding="false"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
-
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+    </androidx.cardview.widget.CardView>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>

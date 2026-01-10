@@ -150,7 +150,19 @@ class MainActivity : BaseActivity() {
         lifecycleScope.launch {
             database.bookDao().getAllBooks().collect { bookEntities ->
                 allBooks.clear()
-                allBooks.addAll(bookEntities.map { it.toBook(coversDir) })
+
+                bookEntities.forEach { entity ->
+                    // Пересчитываем реальное количество глав при загрузке (на случай несоответствия)
+                    val realCount = database.bookDao().getRealChapterCount(entity.id)
+
+                    // Если счётчик в базе устарел — обновляем его
+                    if (realCount != entity.chaptersCount) {
+                        database.bookDao().updateChaptersCount(entity.id, realCount)
+                    }
+
+                    val book = entity.toBook(coversDir).copy(chaptersCount = realCount)
+                    allBooks.add(book)
+                }
 
                 books.clear()
                 books.addAll(allBooks)
@@ -405,8 +417,20 @@ class MainActivity : BaseActivity() {
                     .collection("books")
                     .document(bookId)
                     .collection("chapters")
-                    .document(chapter.position.toString())
-                batch.set(ref, chapter)
+                    .document(chapter.chapterId) // ✅
+
+                val cloudData = mapOf(
+                    "chapterId" to chapter.chapterId,
+                    "title" to chapter.title,
+                    "description" to chapter.description,
+                    "date" to chapter.date,
+                    "wordCount" to chapter.wordCount,
+                    "isFavorite" to chapter.isFavorite,
+                    "position" to chapter.position,
+                    "createdAt" to chapter.createdAt,
+                    "updatedAt" to chapter.updatedAt
+                )
+                batch.set(ref, cloudData)
             }
             batch.commit().await()
             Log.d("SYNC", "Залито ${localChapters.size} глав для книги $bookId")
@@ -426,17 +450,21 @@ class MainActivity : BaseActivity() {
 
             val cloudChapters = snapshot.documents.mapNotNull { doc ->
                 val chapter = doc.toObject(Chapter::class.java) ?: return@mapNotNull null
-                // преобразуем в Entity с правильным bookId!
+
                 ChapterEntity(
+                    chapterId = chapter.chapterId,
                     bookId = bookId,
-                    position = doc.id.toInt(),
+                    position = chapter.position,
                     title = chapter.title,
                     description = chapter.description,
+                    content = chapter.content,
                     date = chapter.date,
                     wordCount = chapter.wordCount,
                     isFavorite = chapter.isFavorite,
-                    updatedAt = System.currentTimeMillis()
+                    createdAt = chapter.createdAt,
+                    updatedAt = chapter.updatedAt
                 )
+
             }
 
             if (cloudChapters.isNotEmpty()) {
@@ -449,6 +477,7 @@ class MainActivity : BaseActivity() {
             Log.e("SYNC", "Ошибка скачивания глав книги $bookId", e)
         }
     }
+
     private fun syncAllFromCloud(user: FirebaseUser) {
         lifecycleScope.launch {
             try {

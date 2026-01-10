@@ -55,10 +55,22 @@ class BookAdapter(
         }
 
         holder.title.text = book.title.ifBlank { "Без названия" }
-        holder.chaptersCount.text = context.getString(R.string.chapters_count, book.chaptersCount)
+        holder.chaptersCount.text = "${book.chaptersCount} ${book.chaptersCount.chapterWordForm()}"
 
         holder.itemView.setOnClickListener { onBookClick(book) }
         holder.menuButton.setOnClickListener { showPopupMenu(it, book, position) }
+    }
+
+    fun Int.chapterWordForm(): String {
+        val count = this % 100
+        val lastDigit = count % 10
+
+        return when {
+            count in 11..14 -> "глав"               // 11–14 всегда "глав"
+            lastDigit == 1 -> "глава"               // 1, 21, 31...
+            lastDigit in 2..4 -> "главы"            // 2–4, 22–24...
+            else -> "глав"                          // 0, 5–9, 15–20...
+        }
     }
 
     private fun showPopupMenu(view: View, book: Book, position: Int) {

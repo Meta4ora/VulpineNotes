@@ -25,4 +25,14 @@ interface BookDao {
     @Query("UPDATE books SET cloudSynced = :state WHERE id = :id")
     suspend fun updateCloudState(id: String, state: Boolean)
 
+    @Query("SELECT COUNT(*) FROM chapters WHERE bookId = :bookId")
+    suspend fun getChapterCountForBook(bookId: String): Int
+
+    @Query("SELECT COUNT(*) FROM chapters WHERE bookId = :bookId")
+    suspend fun getRealChapterCount(bookId: String): Int
+
+    // Метод для обновления счётчика (вызывать после добавления/удаления главы)
+    @Query("UPDATE books SET chaptersCount = :count, updatedAt = :now WHERE id = :bookId")
+    suspend fun updateChaptersCount(bookId: String, count: Int, now: Long = System.currentTimeMillis())
+
 }

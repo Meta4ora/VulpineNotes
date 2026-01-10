@@ -41,24 +41,6 @@
 
         </androidx.cardview.widget.CardView>
 
-        <com.google.android.material.chip.Chip
-            android:id="@+id/filter_chip"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="0dp"
-            android:text="Название"
-            android:textColor="?attr/colorOnPrimary"
-            app:chipBackgroundColor="?attr/colorPrimary"
-            app:chipCornerRadius="20dp"
-            app:chipIcon="@drawable/ic_filter"
-            app:chipIconTint="?attr/colorOnPrimary"
-            app:chipIconVisible="true"
-            android:clickable="true"
-            android:focusable="true"
-            app:layout_scrollFlags="scroll|enterAlways" />
-
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.recyclerview.widget.RecyclerView

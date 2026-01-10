@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:id="@+id/infoTitle"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Заголовок"/>
+
+    <TextView
+        android:id="@+id/infoDescription"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Описание"/>
+
+    <TextView
+        android:id="@+id/infoWordCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Слов: 0"/>
+
+    <TextView
+        android:id="@+id/infoDate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Дата"/>
+
+    <TextView
+        android:id="@+id/infoCreated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Создано"/>
+
+    <TextView
+        android:id="@+id/infoUpdated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Изменено"/>
+
+    <TextView
+        android:id="@+id/infoFavorite"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Избранное"/>
+</LinearLayout>
