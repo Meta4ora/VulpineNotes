@@ -32,6 +32,6 @@ class SplashActivity : AppCompatActivity() {
         Handler(Looper.getMainLooper()).postDelayed({
             startActivity(Intent(this, MainActivity::class.java))
             finish()
-        }, 2000) // 1.8 сек — чтобы анимация завершилась
+        }, 2000) // 2 сек
     }
 }

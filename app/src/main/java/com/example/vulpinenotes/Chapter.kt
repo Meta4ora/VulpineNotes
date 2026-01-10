@@ -5,12 +5,14 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 data class Chapter(
-    val title: String = "",
-    val description: String = "",
-    val date: String = "",
-    val wordCount: Int = 0,
-    var isFavorite: Boolean = false
-) : Parcelable {
-    // ← ЭТОТ КОНСТРУКТОР РЕШИТ ВСЁ!
-    constructor() : this("", "", "", 0, false)
-}
+    val chapterId: String,
+    val title: String,
+    val description: String,
+    val content: String,
+    val date: String,
+    val wordCount: Int,
+    val isFavorite: Boolean,
+    val position: Int,
+    val createdAt: Long,
+    val updatedAt: Long
+) : Parcelable

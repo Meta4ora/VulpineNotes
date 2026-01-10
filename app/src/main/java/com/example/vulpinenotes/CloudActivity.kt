@@ -107,14 +107,14 @@ class CloudActivity : AppCompatActivity() {
         }
         activityScope.launch {
             try {
-// 1. Получаем список ID книг из облака
+                // 1. получаем список ID книг из облака
                 val cloudSnapshot = db.collection("users")
                     .document(auth.currentUser!!.uid)
                     .collection("books")
                     .get()
                     .await()
                 val cloudBookIds = cloudSnapshot.documents.map { it.id }.toSet()
-// 2. Получаем все локальные книги
+                // 2. получаем все локальные книги
                 val localBookEntities = withContext(Dispatchers.IO) {
                     roomDb.bookDao().getAllBooksSync()
                 }
@@ -123,10 +123,10 @@ class CloudActivity : AppCompatActivity() {
                 localBookEntities.forEach { entity ->
                     val book = entity.toBook(coversDir)
                     if (cloudBookIds.contains(entity.id)) {
-// Книга есть в облаке → принудительно считаем её синхронизированной
+                        // книга есть в облаке - принудительно считаем её синхронизированной
                         val syncedBook = book.copy(cloudSynced = true)
                         allSyncedBooks.add(syncedBook)
-// Защита: если в базе вдруг cloudSynced = false — исправляем
+                        // защита: если в базе вдруг cloudSynced = false — исправляем
                         if (!entity.cloudSynced) {
                             withContext(Dispatchers.IO) {
                                 roomDb.bookDao().updateCloudState(entity.id, true)
@@ -144,7 +144,7 @@ class CloudActivity : AppCompatActivity() {
             }
         }
     }
-    // Загрузка одной книги в облако
+    // загрузка одной книги в облако
     private fun uploadBookToCloud(book: Book) {
         val user = auth.currentUser ?: return
         val data = hashMapOf(
@@ -161,13 +161,12 @@ class CloudActivity : AppCompatActivity() {
                     .document(book.id)
                     .set(data)
                     .await()
-// ВАЖНО: обновляем флаг в Room!
                 withContext(Dispatchers.IO) {
                     roomDb.bookDao().updateCloudState(book.id, true)
                 }
                 vibrator.vibrate(80)
                 Toast.makeText(this@CloudActivity, "«${book.title}» загружено в облако", Toast.LENGTH_SHORT).show()
-// Перемещаем в другой список
+                // перемещаем в другой список
                 allLocalOnlyBooks.remove(book)
                 allSyncedBooks.add(book.copy(cloudSynced = true))
                 filterBooks(searchEditText.text.toString())
@@ -178,7 +177,7 @@ class CloudActivity : AppCompatActivity() {
             }
         }
     }
-    // Удаление книги из облака (остаётся локально)
+    // удаление книги из облака (остаётся локально)
     private fun deleteBookFromCloud(book: Book) {
         val user = auth.currentUser ?: return
         MaterialAlertDialogBuilder(this)
@@ -193,13 +192,13 @@ class CloudActivity : AppCompatActivity() {
                             .document(book.id)
                             .delete()
                             .await()
-// Снимаем флаг синхронизации локально
+                        // снимаем флаг синхронизации локально
                         withContext(Dispatchers.IO) {
                             roomDb.bookDao().updateCloudState(book.id, false)
                         }
                         vibrator.vibrate(80)
                         Toast.makeText(this@CloudActivity, "Удалено из облака", Toast.LENGTH_SHORT).show()
-// Перемещаем обратно в "только локальные"
+                        // перемещаем обратно в "только локальные"
                         allSyncedBooks.remove(book)
                         allLocalOnlyBooks.add(book.copy(cloudSynced = false))
                         filterBooks(searchEditText.text.toString())
@@ -213,7 +212,7 @@ class CloudActivity : AppCompatActivity() {
             .setNegativeButton("Отмена", null)
             .show()
     }
-    // Загрузить все локальные книги в облако
+    // загрузить все локальные книги в облако
     private fun uploadAllLocalBooks() {
         if (allLocalOnlyBooks.isEmpty()) {
             Toast.makeText(this, "Нет книг для загрузки", Toast.LENGTH_SHORT).show()

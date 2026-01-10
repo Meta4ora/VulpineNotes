@@ -14,6 +14,7 @@ fun BookEntity.toBook(coversDir: File): Book {
         coverUri = coverUri,
         chaptersCount = chaptersCount,
         updatedAt = updatedAt,
+        createdAt = createdAt,
         cloudSynced = this.cloudSynced
     )
 }

@@ -13,8 +13,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.vulpinenotes.data.AppDatabase
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.*
 import java.io.File
 
@@ -42,29 +40,44 @@ class BookAdapter(
     override fun onBindViewHolder(holder: BookViewHolder, position: Int) {
         val book = books[position]
 
-        // Обложка
+        // обложка
         if (book.coverUri != null) {
             Glide.with(context)
                 .load(book.coverUri)
-                .placeholder(R.drawable.book_cover_placeholder)
-                .error(R.drawable.book_cover_placeholder)
+                .placeholder(R.drawable.book_vector_placeholder)
+                .error(R.drawable.book_vector_placeholder)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE) // не использовать кэш на диске
+                .skipMemoryCache(true) // не использовать память
                 .into(holder.cover)
+
         } else {
-            holder.cover.setImageResource(R.drawable.book_cover_placeholder)
+            holder.cover.setImageResource(R.drawable.book_vector_placeholder)
         }
 
         holder.title.text = book.title.ifBlank { "Без названия" }
-        holder.chaptersCount.text = context.getString(R.string.chapters_count, book.chaptersCount)
+        holder.chaptersCount.text = "${book.chaptersCount} ${book.chaptersCount.chapterWordForm()}"
 
         holder.itemView.setOnClickListener { onBookClick(book) }
         holder.menuButton.setOnClickListener { showPopupMenu(it, book, position) }
+    }
+
+    fun Int.chapterWordForm(): String {
+        val count = this % 100
+        val lastDigit = count % 10
+
+        return when {
+            count in 11..14 -> "глав"               // 11–14 всегда "глав"
+            lastDigit == 1 -> "глава"               // 1, 21, 31...
+            lastDigit in 2..4 -> "главы"            // 2–4, 22–24...
+            else -> "глав"                          // 0, 5–9, 15–20...
+        }
     }
 
     private fun showPopupMenu(view: View, book: Book, position: Int) {
         val popup = PopupMenu(context, view)
         popup.inflate(R.menu.book_context_menu)
 
-        // Если хочешь отдельный пункт "Удалить полностью" — раскомментируй в меню XML
+        // если хочешь отдельный пункт "Удалить полностью" — раскомментировать надо в xml
         // popup.menu.findItem(R.id.action_delete_permanently)?.isVisible = book.cloudSynced
 
         popup.setOnMenuItemClickListener { item ->
@@ -81,7 +94,7 @@ class BookAdapter(
                     showDeleteLocalDialog(book, position)
                     true
                 }
-                // Если добавишь в меню:
+                // если надо будет добавить в меню:
                 // R.id.action_delete_permanently -> { deleteBookEverywhere(book, position); true }
                 else -> false
             }
@@ -89,27 +102,27 @@ class BookAdapter(
         popup.show()
     }
 
-    // Удаление ТОЛЬКО с устройства (остаётся в облаке)
+    //  удаление только локально
     private fun showDeleteLocalDialog(book: Book, position: Int) {
         MaterialAlertDialogBuilder(context)
             .setTitle("Удалить с устройства?")
             .setMessage("Книга «${book.title}» будет удалена только с этого телефона.\n\nВ облаке она останется доступна на других устройствах.")
             .setPositiveButton("Удалить") { _, _ ->
-                deleteBookLocally(book, position)
+                deleteBookLocally(book)
             }
             .setNegativeButton("Отмена", null)
             .show()
     }
 
-    private fun deleteBookLocally(book: Book, position: Int) {
+    private fun deleteBookLocally(book: Book) {
         (context as? MainActivity)?.lifecycleScope?.launch(Dispatchers.IO) {
             try {
                 val dao = AppDatabase.getDatabase(context).bookDao()
 
-                // 1. Удаляем из Room
+                // 1. удаляем из Room
                 dao.deleteById(book.id)
 
-                // 2. Удаляем обложку с диска
+                // 2. удаляем обложку с диска
                 book.coverUri?.let { uri ->
                     if (uri.scheme == "file") {
                         File(uri.path!!).takeIf { it.exists() }?.delete()
@@ -117,13 +130,14 @@ class BookAdapter(
                 }
 
                 withContext(Dispatchers.Main) {
-                    // Удаляем из списка и обновляем UI
-                    books.removeAt(position)
-                    notifyItemRemoved(position)
-                    notifyItemRangeChanged(position, books.size)
-
+                    val index = books.indexOfFirst { it.id == book.id }
+                    if (index != -1) {
+                        books.removeAt(index)
+                        notifyItemRemoved(index)
+                    }
                     Toast.makeText(context, "Книга удалена с устройства", Toast.LENGTH_SHORT).show()
                 }
+
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Ошибка при удалении", Toast.LENGTH_SHORT).show()
@@ -132,7 +146,8 @@ class BookAdapter(
         }
     }
 
-    // Удаление из облака и лоркально одновременно
+
+    // удаление из облака и лоркально одновременно
     // надо добавить в book_context_menu.xml пункт с id action_delete_permanently
     // пока убрал за ненадобностью
     /*

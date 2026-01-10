@@ -28,17 +28,17 @@ class CloudBookAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val book = books[position]
 
-        // Название — теперь только снизу
+        // название — теперь только снизу
         holder.titleText.text = book.title.ifBlank { "Без названия" }
 
-        // Обложка
+        // обложка
         if (book.coverUri != null) {
             Glide.with(holder.itemView.context)
                 .load(book.coverUri)
-                .placeholder(R.drawable.book_cover_placeholder)
+                .placeholder(R.drawable.book_vector_placeholder)
                 .into(holder.coverImage)
         } else {
-            holder.coverImage.setImageResource(R.drawable.book_cover_placeholder)
+            holder.coverImage.setImageResource(R.drawable.book_vector_placeholder)
         }
 
         holder.cloudButton.setImageResource(

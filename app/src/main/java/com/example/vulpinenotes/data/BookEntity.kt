@@ -9,5 +9,6 @@ data class BookEntity @JvmOverloads constructor(
     val coverPath: String? = null,
     val chaptersCount: Int = 0,
     val updatedAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = System.currentTimeMillis(),
     val cloudSynced: Boolean = false
 )

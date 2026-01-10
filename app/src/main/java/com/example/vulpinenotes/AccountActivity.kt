@@ -19,7 +19,7 @@ import de.hdodenhof.circleimageview.CircleImageView
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 
-class AccountActivity : AppCompatActivity() {
+class AccountActivity : BaseActivity() {
 
     private lateinit var auth: FirebaseAuth
     private lateinit var googleSignInClient: GoogleSignInClient
@@ -39,7 +39,7 @@ class AccountActivity : AppCompatActivity() {
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = "Аккаунт"
+        supportActionBar?.title = getString(R.string.account_title)
 
         auth = FirebaseAuth.getInstance()
 
@@ -69,8 +69,11 @@ class AccountActivity : AppCompatActivity() {
     private fun signOut() {
         auth.signOut()
         googleSignInClient.signOut()
-        updateUI(null)
+
+        setResult(RESULT_OK)
+        finish()
     }
+
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
