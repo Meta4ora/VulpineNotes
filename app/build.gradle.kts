@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.vulpinenotes"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -43,6 +43,22 @@ android {
     packaging {
         resources {
             excludes += setOf("META-INF/LICENSE", "META-INF/LICENSE-FIREBASE.txt", "META-INF/NOTICE")
+            excludes += setOf(
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/DEPENDENCIES",
+
+                "META-INF/LICENSE-LGPL-2.1.txt",
+                "META-INF/LICENSE-LGPL-3.txt",
+                "META-INF/LICENSE-APACHE-2.0.txt",
+
+                "META-INF/*.kotlin_module",
+                "META-INF/versions/**",
+                "META-INF/*.version",
+                "**/module-info.class"
+            )
         }
     }
 }
@@ -106,4 +122,10 @@ dependencies {
     implementation("io.noties.markwon:html:4.6.2")
 
     implementation("io.noties.markwon:ext-tables:4.6.2")
+
+    // Для экспорта в PDF (iText)
+    implementation("com.itextpdf:itext7-core:8.0.5")
+    implementation("com.itextpdf:html2pdf:5.0.5")
+    // Для работы с HTML (JSoup)
+    implementation("org.jsoup:jsoup:1.17.2")
 }

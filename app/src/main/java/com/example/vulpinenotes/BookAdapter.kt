@@ -21,7 +21,8 @@ class BookAdapter(
     private val context: Context,
     private val onShowInfo: (Book) -> Unit,
     private val onEditBook: (Book, Int) -> Unit,
-    private val onBookClick: (Book) -> Unit
+    private val onBookClick: (Book) -> Unit,
+    private val onExportBook: (Book) -> Unit  // Добавлен callback для экспорта
 ) : RecyclerView.Adapter<BookAdapter.BookViewHolder>() {
 
     inner class BookViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -46,10 +47,9 @@ class BookAdapter(
                 .load(book.coverUri)
                 .placeholder(R.drawable.book_vector_placeholder)
                 .error(R.drawable.book_vector_placeholder)
-                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE) // не использовать кэш на диске
-                .skipMemoryCache(true) // не использовать память
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
+                .skipMemoryCache(true)
                 .into(holder.cover)
-
         } else {
             holder.cover.setImageResource(R.drawable.book_vector_placeholder)
         }
@@ -66,19 +66,16 @@ class BookAdapter(
         val lastDigit = count % 10
 
         return when {
-            count in 11..14 -> "глав"               // 11–14 всегда "глав"
-            lastDigit == 1 -> "глава"               // 1, 21, 31...
-            lastDigit in 2..4 -> "главы"            // 2–4, 22–24...
-            else -> "глав"                          // 0, 5–9, 15–20...
+            count in 11..14 -> "глав"
+            lastDigit == 1 -> "глава"
+            lastDigit in 2..4 -> "главы"
+            else -> "глав"
         }
     }
 
     private fun showPopupMenu(view: View, book: Book, position: Int) {
         val popup = PopupMenu(context, view)
         popup.inflate(R.menu.book_context_menu)
-
-        // если хочешь отдельный пункт "Удалить полностью" — раскомментировать надо в xml
-        // popup.menu.findItem(R.id.action_delete_permanently)?.isVisible = book.cloudSynced
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -94,15 +91,16 @@ class BookAdapter(
                     showDeleteLocalDialog(book, position)
                     true
                 }
-                // если надо будет добавить в меню:
-                // R.id.action_delete_permanently -> { deleteBookEverywhere(book, position); true }
+                R.id.action_export -> {
+                    onExportBook(book)  // Вызываем callback для экспорта
+                    true
+                }
                 else -> false
             }
         }
         popup.show()
     }
 
-    //  удаление только локально
     private fun showDeleteLocalDialog(book: Book, position: Int) {
         MaterialAlertDialogBuilder(context)
             .setTitle("Удалить с устройства?")
@@ -118,11 +116,8 @@ class BookAdapter(
         (context as? MainActivity)?.lifecycleScope?.launch(Dispatchers.IO) {
             try {
                 val dao = AppDatabase.getDatabase(context).bookDao()
-
-                // 1. удаляем из Room
                 dao.deleteById(book.id)
 
-                // 2. удаляем обложку с диска
                 book.coverUri?.let { uri ->
                     if (uri.scheme == "file") {
                         File(uri.path!!).takeIf { it.exists() }?.delete()
@@ -137,7 +132,6 @@ class BookAdapter(
                     }
                     Toast.makeText(context, "Книга удалена с устройства", Toast.LENGTH_SHORT).show()
                 }
-
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Ошибка при удалении", Toast.LENGTH_SHORT).show()
@@ -145,35 +139,6 @@ class BookAdapter(
             }
         }
     }
-
-
-    // удаление из облака и лоркально одновременно
-    // надо добавить в book_context_menu.xml пункт с id action_delete_permanently
-    // пока убрал за ненадобностью
-    /*
-    private fun deleteBookEverywhere(book: Book, position: Int) {
-        (context as? MainActivity)?.lifecycleScope?.launch(Dispatchers.IO) {
-            val dao = AppDatabase.getDatabase(context).bookDao()
-            dao.deleteById(book.id)
-
-            book.coverUri?.path?.let { File(it).delete() }
-
-            FirebaseAuth.getInstance().currentUser?.let { user ->
-                FirebaseFirestore.getInstance()
-                    .collection("users").document(user.uid)
-                    .collection("books").document(book.id)
-                    .delete()
-            }
-
-            withContext(Dispatchers.Main) {
-                books.removeAt(position)
-                notifyItemRemoved(position)
-                notifyItemRangeChanged(position, books.size)
-                Toast.makeText(context, "Книга удалена полностью", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-    */
 
     override fun getItemCount() = books.size
 
