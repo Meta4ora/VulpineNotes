@@ -43,6 +43,17 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
+import com.itextpdf.kernel.geom.PageSize
+import com.itextpdf.kernel.pdf.PdfDocument
+import com.itextpdf.kernel.pdf.PdfWriter
+import com.itextpdf.layout.Document
+import com.itextpdf.layout.element.Paragraph
+import com.itextpdf.layout.element.IBlockElement
+import com.itextpdf.layout.element.Div
+import com.itextpdf.layout.element.AreaBreak
+import com.itextpdf.layout.properties.AreaBreakType
+import com.itextpdf.layout.properties.TextAlignment
+
 
 class MainActivity : BaseActivity() {
 
@@ -614,7 +625,6 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
-    // Генерация контента для экспорта (Markdown или PDF)
     private suspend fun generateExportContent(book: Book, format: String): ByteArray =
         withContext(Dispatchers.IO) {
             try {
@@ -624,20 +634,20 @@ class MainActivity : BaseActivity() {
                 val sortedChapters = chapters.sortedBy { it.position }
                 val dateFormat = java.text.DateFormat.getDateTimeInstance()
 
-                // Markdown контент - БЕЗ page-break-before для заголовков
+                // Markdown контент
                 val markdownContent = buildString {
                     appendLine("# ${book.title}\n")
                     appendLine("**Описание:** ${book.desc.ifBlank { "Нет описания" }}\n")
                     appendLine("**Создано:** ${dateFormat.format(Date(book.createdAt))}\n")
                     appendLine("---\n")
-                    for (chapter in sortedChapters) {
+                    for ((index, chapter) in sortedChapters.withIndex()) {
+                        // Добавляем специальный разделитель между главами
+                        if (index > 0) {
+                            appendLine("# ##") // Специальный маркер для разрыва страницы
+                        }
                         appendLine("## ${chapter.title}\n")
                         appendLine(chapter.content)
                         appendLine("\n")
-                        // Только разделитель между главами, без принудительного разрыва страницы
-                        if (sortedChapters.last() != chapter) {
-                            appendLine("---\n")
-                        }
                     }
                 }
 
@@ -645,11 +655,29 @@ class MainActivity : BaseActivity() {
                     "md", "markdown" -> markdownContent.toByteArray(Charsets.UTF_8)
 
                     "pdf" -> {
-                        // Конвертируем Markdown в HTML с правильным форматированием
-                        val html = markdownToHtml(markdownContent)
-                        ByteArrayOutputStream().use {
-                            HtmlConverter.convertToPdf(html, it)
-                            it.toByteArray()
+                        // Получаем HTML
+                        val htmlContent = markdownToHtml(markdownContent)
+
+                        // Конвертируем HTML в PDF с улучшенной обработкой
+                        ByteArrayOutputStream().use { outputStream ->
+                            PdfWriter(outputStream).use { writer ->
+                                PdfDocument(writer).use { pdfDoc ->
+                                    pdfDoc.defaultPageSize = PageSize.A4
+
+                                    // Создаем конвертер с настройками
+                                    val converterProperties = com.itextpdf.html2pdf.ConverterProperties().apply {
+                                        setBaseUri("") // Указываем пустой базовый URI
+                                        setCreateAcroForm(false)
+                                    }
+
+                                    // Конвертируем HTML в PDF
+                                    HtmlConverter.convertToPdf(htmlContent, pdfDoc, converterProperties)
+
+                                    // Добавляем footer на каждую страницу
+                                    addFooterToAllPages(pdfDoc, book.title)
+                                }
+                            }
+                            outputStream.toByteArray()
                         }
                     }
 
@@ -657,21 +685,96 @@ class MainActivity : BaseActivity() {
                 }
             } catch (e: Exception) {
                 Log.e("EXPORT", "Ошибка генерации контента: ${e.message}", e)
+                // Возвращаем PDF с сообщением об ошибке
+                if (format.lowercase() == "pdf") {
+                    return@withContext createErrorPdf(e.message ?: "Неизвестная ошибка")
+                }
                 throw e
             }
         }
 
-    // Улучшенная функция преобразования Markdown в HTML
+    // ДОБАВЬ эту функцию для добавления footer на все страницы
+    private fun addFooterToAllPages(pdfDoc: PdfDocument, bookTitle: String) {
+        try {
+            val totalPages = pdfDoc.numberOfPages
+            for (i in 1..totalPages) {
+                val page = pdfDoc.getPage(i)
+                val pageSize = page.pageSize
+
+                // Создаем новую Document для добавления footer
+                Document(pdfDoc, pageSize as PageSize?, false).use { doc ->
+                    val footerText = "Страница $i из $totalPages | Сделано в Vulpine Notes"
+                    val footer = Paragraph(footerText)
+                        .setFontSize(9f)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFixedPosition(
+                            pageSize.left + 20,
+                            pageSize.bottom + 10,
+                            pageSize.width - 40
+                        )
+
+                    doc.add(footer)
+                    doc.close()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PDF", "Ошибка добавления footer: ${e.message}", e)
+        }
+    }
+
+    // ДОБАВЬ эту вспомогательную функцию для создания PDF с ошибкой
+    private fun createErrorPdf(errorMessage: String): ByteArray {
+        return ByteArrayOutputStream().use { outputStream ->
+            PdfWriter(outputStream).use { writer ->
+                PdfDocument(writer).use { pdfDoc ->
+                    Document(pdfDoc).use { document ->
+                        pdfDoc.defaultPageSize = PageSize.A4
+
+                        document.add(Paragraph("Ошибка при экспорте книги")
+                            .setFontSize(16f)
+                            .setBold()
+                            .setTextAlignment(TextAlignment.CENTER))
+
+                        document.add(Paragraph("\n"))
+
+                        document.add(Paragraph("Произошла ошибка при создании PDF файла:")
+                            .setFontSize(12f))
+
+                        document.add(Paragraph(errorMessage)
+                            .setFontSize(10f)
+                            .setItalic()
+                            .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY))
+
+                        document.add(Paragraph("\n\n"))
+
+                        document.add(Paragraph("Сделано в Vulpine Notes")
+                            .setFontSize(10f)
+                            .setTextAlignment(TextAlignment.CENTER))
+                    }
+                }
+            }
+            outputStream.toByteArray()
+        }
+    }
+
+    // ОБНОВИ функцию markdownToHtml для правильной обработки разрывов страниц
+    // ЗАМЕНИ функцию markdownToHtml полностью:
     private fun markdownToHtml(markdown: String): String {
         val sb = StringBuilder()
         val lines = markdown.lines()
         var inTable = false
         var inCodeBlock = false
         var inQuote = false
-        var inUl = false  // Маркированный список
-        var inOl = false  // Нумерованный список
-        var emptyLineCount = 0 // Счетчик пустых строк подряд
-        var chapterCount = 0 // Счетчик глав
+        var inUl = false
+        var inOl = false
+        var emptyLineCount = 0
+        var chapterCount = 0
+        var isTitlePagePassed = false
+        var previousLineWasH1 = false
+
+        // Для обработки таблиц
+        var tableRows = mutableListOf<List<String>>()
+        var isHeaderRow = false
 
         sb.append("<!DOCTYPE html>")
         sb.append("<html><head><meta charset=\"UTF-8\">")
@@ -679,7 +782,7 @@ class MainActivity : BaseActivity() {
         // Основные стили
         sb.append("body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }")
         sb.append("h1 { border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 20px; }")
-        sb.append("h2 { margin-top: 30px; padding-top: 20px; }")
+        sb.append("h2 { margin-top: 30px; padding-top: 20px; border-bottom: 1px solid #ddd; }")
         sb.append("h3 { margin-top: 25px; }")
         sb.append("p { margin: 8px 0; }")
         sb.append("em { font-style: italic; }")
@@ -696,11 +799,20 @@ class MainActivity : BaseActivity() {
         sb.append("ul, ol { margin: 10px 0; padding-left: 25px; }")
         sb.append("li { margin: 5px 0; }")
         sb.append("img { max-width: 100%; height: auto; }")
-        // Стиль для разрыва страниц между главами
+
+        // Убрали page-break-before из заголовков
+        sb.append("h1, h2, h3 { page-break-before: avoid; page-break-after: avoid; }")
+
+        // Специальный класс для разрыва между главой и контентом
         sb.append(".chapter-break { page-break-before: always; }")
+
+        // Стиль для заглавной страницы
+        sb.append(".title-page { text-align: center; margin-top: 100px; }")
+        sb.append(".title-page h1 { border: none; font-size: 24pt; }")
+        sb.append(".title-page p { font-size: 14pt; color: #666; }")
         sb.append("</style></head><body>")
 
-        // Функция для обработки inline форматирования
+        // Функция для применения inline разметки
         fun applyInlineMarkdown(text: String): String {
             var t = text
 
@@ -758,28 +870,62 @@ class MainActivity : BaseActivity() {
 
         // Функция для закрытия всех активных блоков
         fun closeActiveBlocks() {
-            if (inUl) { sb.append("</ul>"); inUl = false }
-            if (inOl) { sb.append("</ol>"); inOl = false }
-            if (inTable) { sb.append("</table>"); inTable = false }
-            if (inQuote) { sb.append("</blockquote>"); inQuote = false }
-            emptyLineCount = 0
-        }
-
-        // Функция для добавления разрыва главы
-        fun addChapterBreak() {
-            if (chapterCount > 0) {
-                sb.append("<div class=\"chapter-break\"></div>")
+            if (inUl) {
+                sb.append("</ul>")
+                inUl = false
             }
-            chapterCount++
+            if (inOl) {
+                sb.append("</ol>")
+                inOl = false
+            }
+            if (inTable) {
+                // Закрываем таблицу
+                if (tableRows.isNotEmpty()) {
+                    sb.append("<table>")
+                    for ((index, row) in tableRows.withIndex()) {
+                        if (index == 0 && isHeaderRow) {
+                            sb.append("<tr>")
+                            for (cell in row) {
+                                sb.append("<th>${applyInlineMarkdown(cell)}</th>")
+                            }
+                            sb.append("</tr>")
+                        } else {
+                            sb.append("<tr>")
+                            for (cell in row) {
+                                sb.append("<td>${applyInlineMarkdown(cell)}</td>")
+                            }
+                            sb.append("</tr>")
+                        }
+                    }
+                    sb.append("</table>")
+                }
+                tableRows.clear()
+                inTable = false
+                isHeaderRow = false
+            }
+            if (inQuote) {
+                sb.append("</blockquote>")
+                inQuote = false
+            }
+            emptyLineCount = 0
         }
 
         // Обработка строк
         for (i in lines.indices) {
             val line = lines[i]
             val trimmedLine = line.trim()
-            val prevLine = if (i > 0) lines[i-1].trim() else ""
+            val nextLine = if (i + 1 < lines.size) lines[i + 1].trim() else ""
 
             when {
+                // СПЕЦИАЛЬНЫЙ РАЗДЕЛИТЕЛЬ ДЛЯ РАЗРЫВА СТРАНИЦ (# ##)
+                trimmedLine == "# ##" -> {
+                    closeActiveBlocks()
+                    // Добавляем div с классом для разрыва страницы
+                    sb.append("<div class=\"chapter-break\"></div>")
+                    emptyLineCount = 0
+                    continue
+                }
+
                 // Блоки кода ```
                 trimmedLine.startsWith("```") -> {
                     inCodeBlock = !inCodeBlock
@@ -796,125 +942,105 @@ class MainActivity : BaseActivity() {
                     emptyLineCount = 0
                 }
 
-                // СПЕЦИАЛЬНЫЕ РАЗДЕЛИТЕЛИ - ПЕРВЫМИ!
-                trimmedLine == "# ##" || trimmedLine == "## ##" || trimmedLine == "# #" -> {
-                    closeActiveBlocks()
-                    // Добавляем разрыв страницы
-                    addChapterBreak()
-                    // Не добавляем HTML для самого разделителя
-                    emptyLineCount = 0
-                    continue // Важно: пропускаем остальную обработку
-                }
-
                 // Разделители (hr) - обычные
-                trimmedLine.matches(Regex("^---+$")) && trimmedLine != "# ##" && trimmedLine != "## ##" -> {
+                trimmedLine.matches(Regex("^---+$")) -> {
                     closeActiveBlocks()
                     sb.append("<hr/>")
                     emptyLineCount = 0
                 }
 
-                // Заголовки - проверяем только если это НЕ специальный разделитель
+                // Заголовки
                 trimmedLine.startsWith("### ") -> {
                     closeActiveBlocks()
                     sb.append("<h3>${applyInlineMarkdown(trimmedLine.substring(4).trim())}</h3>")
                     emptyLineCount = 0
+                    previousLineWasH1 = false
                 }
                 trimmedLine.startsWith("## ") -> {
-                    // Проверяем, не является ли это специальным разделителем
-                    if (trimmedLine == "## ##" || trimmedLine == "# ##") {
-                        // Уже обработано выше
-                        emptyLineCount = 0
-                    } else {
-                        closeActiveBlocks()
+                    closeActiveBlocks()
 
-                        // Определяем, является ли это заголовком главы
-                        val isChapterTitle = trimmedLine.contains("глава", ignoreCase = true) ||
-                                trimmedLine.contains("chapter", ignoreCase = true) ||
-                                trimmedLine.length < 50
-
-                        if (isChapterTitle) {
-                            addChapterBreak()
-                        }
-
-                        // Заголовок без встроенного page-break
-                        sb.append("<h2>${applyInlineMarkdown(trimmedLine.substring(3).trim())}</h2>")
-                        emptyLineCount = 0
+                    // Если это первая глава после заглавной страницы, добавляем разрыв
+                    if (isTitlePagePassed && chapterCount == 0) {
+                        sb.append("<div class=\"chapter-break\"></div>")
                     }
+
+                    sb.append("<h2>${applyInlineMarkdown(trimmedLine.substring(3).trim())}</h2>")
+                    emptyLineCount = 0
+                    previousLineWasH1 = false
+                    chapterCount++
                 }
                 trimmedLine.startsWith("# ") -> {
-                    // Проверяем, не является ли это специальным разделителем
-                    if (trimmedLine == "# ##" || trimmedLine == "## ##") {
-                        // Уже обработано выше
-                        emptyLineCount = 0
-                    } else {
-                        closeActiveBlocks()
+                    closeActiveBlocks()
 
-                        // Для h1 проверяем контекст
-                        val isMainTitle = i == 0 || prevLine.isEmpty()
-                        if (isMainTitle && chapterCount == 0) {
-                            chapterCount++ // Увеличиваем счетчик, но не добавляем разрыв
-                        } else if (isMainTitle) {
-                            addChapterBreak()
-                        }
-
+                    if (!isTitlePagePassed) {
+                        // Это заглавная страница книги
+                        sb.append("<div class=\"title-page\">")
                         sb.append("<h1>${applyInlineMarkdown(trimmedLine.substring(2).trim())}</h1>")
-                        emptyLineCount = 0
+                        isTitlePagePassed = true
+                        previousLineWasH1 = true
+                    } else {
+                        // Это другой H1 заголовок (возможно, в содержании)
+                        sb.append("<h1>${applyInlineMarkdown(trimmedLine.substring(2).trim())}</h1>")
+                        previousLineWasH1 = true
                     }
+                    emptyLineCount = 0
                 }
 
-                // Таблицы
-                line.contains("|") && !inCodeBlock -> {
-                    val trimmedLine = line.trim()
-                    if (trimmedLine.startsWith("|") && trimmedLine.endsWith("|")) {
-                        val cells = trimmedLine.trim('|').split("|").map { applyInlineMarkdown(it.trim()) }
+                // Закрываем div заглавной страницы при следующем не-пустом элементе после H1
+                previousLineWasH1 && trimmedLine.isNotEmpty() && !trimmedLine.startsWith("#") -> {
+                    if (isTitlePagePassed && chapterCount == 0) {
+                        // Завершаем заглавную страницу
+                        sb.append("</div>")
+                        // Добавляем разрыв перед первой главой
+                        sb.append("<div class=\"chapter-break\"></div>")
+                    }
+                    previousLineWasH1 = false
+                    // Не используем return@when - продолжаем обработку этой же строки
+                }
+
+                // Таблицы (должно быть после проверки заголовков)
+                line.contains("|") && !inCodeBlock && !trimmedLine.startsWith(">") -> {
+                    // Проверяем, есть ли символы | в начале и конце или нет
+                    val cleanLine = line.trim()
+                    if (cleanLine.startsWith("|") || cleanLine.endsWith("|")) {
+                        val cells = cleanLine.trim('|').split("|").map { it.trim() }
 
                         if (!inTable) {
+                            // Если это начало таблицы, закрываем предыдущие блоки
                             closeActiveBlocks()
-                            sb.append("<table>")
                             inTable = true
+                            tableRows.clear()
                         }
 
+                        // Проверяем, является ли это разделительной строкой
                         val isSeparator = cells.all { cell -> cell.matches(Regex("^:?---+:?$")) }
 
                         if (isSeparator) {
-                            // Разделитель таблицы
+                            isHeaderRow = true
                         } else {
-                            sb.append("<tr>")
-                            for (cell in cells) {
-                                val isHeader = i > 0 && lines[i-1].trim().matches(Regex("^\\|(:?---+:?\\|?)+$"))
-                                if (isHeader) {
-                                    sb.append("<th>$cell</th>")
-                                } else {
-                                    sb.append("<td>$cell</td>")
-                                }
-                            }
-                            sb.append("</tr>")
+                            tableRows.add(cells)
                         }
-                        emptyLineCount = 0
-                    }
-                }
 
-                // Завершение таблицы
-                trimmedLine.isEmpty() && inTable -> {
-                    sb.append("</table>")
-                    inTable = false
-                    emptyLineCount++
+                        emptyLineCount = 0
+                        continue
+                    }
                 }
 
                 // Цитаты
                 trimmedLine.startsWith("> ") -> {
-                    if (inUl) { sb.append("</ul>"); inUl = false }
-                    if (inOl) { sb.append("</ol>"); inOl = false }
-
                     val quoteContent = applyInlineMarkdown(trimmedLine.substring(2).trim())
                     if (!inQuote) {
+                        closeActiveBlocks()
                         sb.append("<blockquote>")
                         inQuote = true
+                    } else {
+                        sb.append("<br/>")
                     }
                     sb.append("<p>$quoteContent</p>")
                     emptyLineCount = 0
 
-                    if (i + 1 < lines.size && !lines[i + 1].trim().startsWith("> ")) {
+                    // Закрываем цитату, если следующая строка не цитата
+                    if (nextLine.isNotEmpty() && !nextLine.startsWith("> ")) {
                         sb.append("</blockquote>")
                         inQuote = false
                     }
@@ -924,45 +1050,87 @@ class MainActivity : BaseActivity() {
                 trimmedLine.matches(Regex("^[-*+]\\s+.*")) -> {
                     val listItem = applyInlineMarkdown(trimmedLine.substring(2).trim())
                     if (!inUl) {
-                        if (inOl) { sb.append("</ol>"); inOl = false }
+                        closeActiveBlocks()
                         sb.append("<ul>")
                         inUl = true
                     }
                     sb.append("<li>$listItem</li>")
                     emptyLineCount = 0
+
+                    // Закрываем список, если следующая строка не элемент списка
+                    if (nextLine.isNotEmpty() && !nextLine.matches(Regex("^[-*+]\\s+.*"))
+                        && !nextLine.matches(Regex("^\\d+\\.\\s+.*"))
+                        && !nextLine.matches(Regex("^\\s+[-*+\\d]\\s+.*"))) {
+                        sb.append("</ul>")
+                        inUl = false
+                    }
                 }
 
-                // Нумерованные списки - УПРОЩЕННАЯ ЛОГИКА
+                // Нумерованные списки
                 trimmedLine.matches(Regex("^\\d+\\.\\s+.*")) -> {
                     // Извлекаем содержимое (без номера)
                     val listItemContent = trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim()
                     val listItem = applyInlineMarkdown(listItemContent)
 
                     if (!inOl) {
-                        if (inUl) { sb.append("</ul>"); inUl = false }
+                        closeActiveBlocks()
                         sb.append("<ol>")
                         inOl = true
                     }
-
                     sb.append("<li>$listItem</li>")
                     emptyLineCount = 0
+
+                    // Закрываем список, если следующая строка не элемент списка
+                    if (nextLine.isNotEmpty() && !nextLine.matches(Regex("^\\d+\\.\\s+.*"))
+                        && !nextLine.matches(Regex("^[-*+]\\s+.*"))
+                        && !nextLine.matches(Regex("^\\s+[-*+\\d]\\s+.*"))) {
+                        sb.append("</ol>")
+                        inOl = false
+                    }
                 }
 
-                // Обычные абзацы
-                trimmedLine.isNotEmpty() -> {
-                    if (!inTable && !inCodeBlock && !trimmedLine.startsWith(">")) {
-                        if (emptyLineCount == 1 && (inUl || inOl)) {
-                            closeActiveBlocks()
-                        } else if (emptyLineCount >= 2) {
-                            closeActiveBlocks()
-                        }
+                // Пустые строки
+                trimmedLine.isEmpty() -> {
+                    emptyLineCount++
 
+                    // Если мы в таблице и встречаем пустую строку, закрываем таблицу
+                    if (inTable) {
+                        closeActiveBlocks()
+                    }
+
+                    // Если два пустых строки подряд и мы в списке, закрываем его
+                    if (emptyLineCount >= 2) {
+                        if (inUl) {
+                            sb.append("</ul>")
+                            inUl = false
+                        }
+                        if (inOl) {
+                            sb.append("</ol>")
+                            inOl = false
+                        }
+                        if (inQuote) {
+                            sb.append("</blockquote>")
+                            inQuote = false
+                        }
+                    } else if (i > 0 && lines[i-1].trim().isNotEmpty() && !inCodeBlock) {
+                        sb.append("<br/>")
+                    }
+                }
+
+                // Обычный текст (абзацы)
+                else -> {
+                    // Если предыдущая строка была пустой и мы не в активных блоках,
+                    // начинаем новый абзац
+                    if (emptyLineCount > 0 && !inUl && !inOl && !inQuote && !inTable && !inCodeBlock) {
+                        sb.append("<p>${applyInlineMarkdown(line)}</p>")
+                    } else if (!inUl && !inOl && !inQuote && !inTable && !inCodeBlock) {
+                        // Проверяем, продолжается ли предыдущий абзац
                         val isContinuation = i > 0 &&
                                 lines[i-1].trim().isNotEmpty() &&
-                                !lines[i-1].trim().matches(Regex("^[-*+]\\s+.*")) &&
-                                !lines[i-1].trim().matches(Regex("^\\d+\\.\\s+.*")) &&
                                 !lines[i-1].trim().startsWith("#") &&
                                 !lines[i-1].trim().startsWith(">") &&
+                                !lines[i-1].trim().matches(Regex("^[-*+]\\s+.*")) &&
+                                !lines[i-1].trim().matches(Regex("^\\d+\\.\\s+.*")) &&
                                 !lines[i-1].trim().matches(Regex("^---+$"))
 
                         if (isContinuation) {
@@ -970,30 +1138,28 @@ class MainActivity : BaseActivity() {
                         } else {
                             sb.append("<p>${applyInlineMarkdown(line)}</p>")
                         }
-                    } else if (!inTable && !inCodeBlock && !inQuote) {
+                    } else if (inTable || inCodeBlock || inQuote) {
+                        // Внутри специальных блоков просто добавляем текст
                         sb.append(applyInlineMarkdown(line))
+                        if (inCodeBlock) sb.append("\n")
                     }
                     emptyLineCount = 0
-                }
-
-                // Пустые строки
-                else -> {
-                    emptyLineCount++
-
-                    if (!inCodeBlock && emptyLineCount >= 2 && (inUl || inOl)) {
-                        closeActiveBlocks()
-                    }
-
-                    if (i > 0 && lines[i-1].trim().isNotEmpty() && !inCodeBlock && !inUl && !inOl) {
-                        sb.append("<br/>")
-                    }
+                    previousLineWasH1 = false
                 }
             }
         }
 
-        // Закрываем незакрытые теги в конце
+        // Закрываем все незакрытые блоки в конце
         closeActiveBlocks()
         if (inCodeBlock) sb.append("</code></pre>")
+        if (inQuote) sb.append("</blockquote>")
+        if (inUl) sb.append("</ul>")
+        if (inOl) sb.append("</ol>")
+
+        // Закрываем div заглавной страницы, если он еще открыт
+        if (previousLineWasH1) {
+            sb.append("</div>")
+        }
 
         sb.append("</body></html>")
         return sb.toString()
