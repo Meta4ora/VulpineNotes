@@ -78,6 +78,8 @@ class MainActivity : BaseActivity() {
     private var selectedImageFile: File? = null
     private lateinit var pickImageLauncher: ActivityResultLauncher<String>
 
+    private var authStateListener: FirebaseAuth.AuthStateListener? = null
+
     // Firebase
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
@@ -141,9 +143,15 @@ class MainActivity : BaseActivity() {
                 syncAllFromCloud(auth.currentUser!!)
             }
         }
+        authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            val currentUser = firebaseAuth.currentUser
+            updateNavHeader()           // ← всегда обновляем шапку
+        }
+        auth.addAuthStateListener(authStateListener!!)
 
         restoreNotifications()
     }
+
 
     private fun initViews() {
         drawerLayout = findViewById(R.id.drawer_layout)
@@ -1214,31 +1222,44 @@ class MainActivity : BaseActivity() {
         return sb.toString()
     }
 
-    // Обработка результата экспорта
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK) {
-            val uri = data?.data ?: return
-            val book = selectedBookForExport ?: return
-            val format = selectedExportFormat ?: return
+            data?.data?.let { uri ->
+                lifecycleScope.launch {
+                    try {
+                        val book = selectedBookForExport ?: return@launch
+                        val format = selectedExportFormat ?: return@launch
 
-            lifecycleScope.launch {
-                try {
-                    val content = generateExportContent(book, format)
-                    contentResolver.openOutputStream(uri)?.use { it.write(content) }
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "Экспорт завершён", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "Ошибка экспорта: ${e.message}", Toast.LENGTH_LONG).show()
+                        val content = generateExportContent(book, format)
+
+                        contentResolver.openOutputStream(uri, "w")?.use { output ->
+                            output.write(content)
+                            output.flush()
+                        }
+
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Книга экспортирована в ${book.title}.${format}",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                    } catch (e: Exception) {
+                        Log.e("EXPORT", "Ошибка записи файла", e)
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Не удалось сохранить файл: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } finally {
+                        selectedBookForExport = null
+                        selectedExportFormat = null
                     }
                 }
+            } ?: run {
+                Toast.makeText(this, "Не выбрано место сохранения", Toast.LENGTH_SHORT).show()
             }
-
-            selectedBookForExport = null
-            selectedExportFormat = null
         }
     }
 

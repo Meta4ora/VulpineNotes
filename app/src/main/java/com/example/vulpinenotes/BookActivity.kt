@@ -65,7 +65,7 @@ class BookActivity : AppCompatActivity() {
                             .getChaptersForBookSync(book.id)
                             .firstOrNull { it.chapterId == updated.chapterId } ?: return@launch
 
-                        uploadChapterToCloud(entity) // ✅ синхронизация
+                        uploadChapterToCloud(entity)
                     }
                 }
             }

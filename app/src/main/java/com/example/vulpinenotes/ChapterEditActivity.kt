@@ -7,13 +7,14 @@ import android.os.Bundle
 import android.text.Editable
 import android.util.TypedValue
 import android.view.View
-import android.view.WindowInsets
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.lifecycle.lifecycleScope
 import com.example.vulpinenotes.data.AppDatabase
 import com.example.vulpinenotes.databinding.ActivityChapterEditBinding
@@ -27,7 +28,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-
 
 class ChapterEditActivity : AppCompatActivity() {
 
@@ -158,7 +158,6 @@ class ChapterEditActivity : AppCompatActivity() {
                     saveStateToUndoStack()
                 }
                 refreshPreview()
-                scrollToCursor()
             }
         })
 
@@ -175,6 +174,18 @@ class ChapterEditActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this) { saveAndExit() }
 
         setupWindowInsets()
+
+        // Добавляем слушатель фокуса для обновления отступов при появлении клавиатуры
+        setupFocusListener()
+    }
+
+    private fun setupFocusListener() {
+        binding.contentEditText.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                // При получении фокуса обновляем отступы
+                updateEditTextPadding()
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -190,37 +201,82 @@ class ChapterEditActivity : AppCompatActivity() {
             // AppBar под статусбар
             binding.appbar.setPadding(0, systemBars.top, 0, 0)
 
-            // Смещаем панель форматирования вверх на высоту клавиатуры
-            if (ime.bottom > 0) {
-                // Клавиатура открыта - перемещаем панель форматирования поверх нее
-                binding.formattingBar.translationY = -ime.bottom.toFloat()
-                binding.formattingBar.visibility = View.VISIBLE
+            // Обновляем отступы для EditText с учетом клавиатуры и панели форматирования
+            updateEditTextPadding(ime.bottom > 0, ime.bottom)
+
+            // Обновляем отступы для предпросмотра
+            val previewBottomPadding = if (ime.bottom > 0) {
+                dpToPx(100) + ime.bottom
             } else {
-                // Клавиатура скрыта - возвращаем панель форматирования вниз
-                binding.formattingBar.translationY = 0f
+                dpToPx(32)
             }
 
-            // Устанавливаем отступы для EditText
             val paddingHorizontal = dpToPx(24)
             val paddingTop = dpToPx(16)
-            val formattingBarHeight = binding.formattingBar.height
-
-            // Дополнительный отступ снизу = высота клавиатуры + высота панели форматирования
-            val extraBottomSpace = if (ime.bottom > 0) {
-                ime.bottom + formattingBarHeight + dpToPx(16)
-            } else {
-                formattingBarHeight + dpToPx(32)
-            }
-
-            binding.contentEditText.setPadding(
+            binding.previewTextView.setPadding(
                 paddingHorizontal,
                 paddingTop,
                 paddingHorizontal,
-                extraBottomSpace
+                previewBottomPadding
             )
+
+            // Меняем margin панели форматирования вместо translationY
+            val params = binding.formattingBar.layoutParams as CoordinatorLayout.LayoutParams
+            if (ime.bottom > 0) {
+                params.bottomMargin = ime.bottom
+            } else {
+                params.bottomMargin = dpToPx(16)
+            }
+            binding.formattingBar.layoutParams = params
+            binding.formattingBar.visibility = View.VISIBLE
 
             insets
         }
+    }
+
+
+    private fun updateEditTextPadding(keyboardVisible: Boolean = false, keyboardHeight: Int = 0) {
+        val paddingHorizontal = dpToPx(24)
+        val paddingTop = dpToPx(16)
+
+        val paddingBottom = if (keyboardVisible) {
+            // Высота панели форматирования + дополнительный отступ
+            val formattingBarHeight = binding.formattingBar.height
+            formattingBarHeight + keyboardHeight + dpToPx(16)
+        } else {
+            // Просто отступ для панели форматирования
+            val formattingBarHeight = binding.formattingBar.height
+            formattingBarHeight + dpToPx(32)
+        }
+
+        binding.contentEditText.setPadding(
+            paddingHorizontal,
+            paddingTop,
+            paddingHorizontal,
+            paddingBottom
+        )
+
+        // Автопрокрутка к курсору
+        if (keyboardVisible) {
+            scrollToCursorDelayed()
+        }
+    }
+
+    private fun scrollToCursorDelayed() {
+        binding.contentEditText.postDelayed({
+            val editText = binding.contentEditText
+            val selectionStart = editText.selectionStart
+            if (selectionStart >= 0) {
+                val layout = editText.layout
+                if (layout != null) {
+                    val line = layout.getLineForOffset(selectionStart)
+                    val lineBottom = layout.getLineBottom(line)
+
+                    // Прокручиваем так, чтобы строка с курсором была видимой
+                    editText.scrollTo(0, lineBottom - editText.height + editText.paddingBottom)
+                }
+            }
+        }, 100)
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -251,52 +307,6 @@ class ChapterEditActivity : AppCompatActivity() {
 
             previousText = currentText
             previousCursor = currentCursor
-        }
-    }
-
-    private fun getKeyboardHeight(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val windowInsets = window.decorView.rootWindowInsets
-            windowInsets?.getInsets(android.view.WindowInsets.Type.ime())?.bottom ?: 0
-        } else {
-            // Для старых версий используем другой способ определения высоты клавиатуры
-            val rect = android.graphics.Rect()
-            window.decorView.getWindowVisibleDisplayFrame(rect)
-            val screenHeight = window.decorView.rootView.height
-            val keyboardHeight = screenHeight - rect.bottom
-
-            // Фильтруем ложные срабатывания (маленькие изменения)
-            if (keyboardHeight > screenHeight * 0.15) {
-                keyboardHeight
-            } else {
-                0
-            }
-        }
-    }
-
-    private fun scrollToCursor() {
-        binding.contentEditText.post {
-            val editText = binding.contentEditText
-            val layout = editText.layout ?: return@post
-
-            val cursor = editText.selectionStart.coerceIn(0, editText.text?.length ?: 0)
-            val line = layout.getLineForOffset(cursor)
-
-            // Позиция курсора относительно начала EditText
-            val cursorY = layout.getLineBottom(line)
-
-            // Видимая область (высота EditText минус панель форматирования)
-            val visibleBottom = editText.height - dpToPx(100) // примерный отступ
-
-            // Если курсор ниже видимой области — скроллим
-            if (cursorY > visibleBottom) {
-                val scrollAmount = cursorY - visibleBottom + dpToPx(50)
-                editText.scrollTo(0, scrollAmount.coerceAtLeast(0))
-            }
-            // Если сильно выше — можно подтянуть вверх (опционально)
-            else if (cursorY < editText.scrollY + dpToPx(40)) {
-                editText.scrollTo(0, (cursorY - dpToPx(40)).coerceAtLeast(0))
-            }
         }
     }
 
@@ -670,16 +680,56 @@ class ChapterEditActivity : AppCompatActivity() {
     }
 
     private fun togglePreview() {
-        isPreviewVisible = !isPreviewVisible
+        val inputMethodManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+
         if (isPreviewVisible) {
-            binding.previewTextView.visibility = View.VISIBLE
-            binding.contentEditText.visibility = View.GONE
-            markwon.setMarkdown(binding.previewTextView, binding.contentEditText.text.toString())
-            binding.previewButton.text = "Редактировать"
-        } else {
+            // Переключаемся в режим редактирования
             binding.previewTextView.visibility = View.GONE
             binding.contentEditText.visibility = View.VISIBLE
+
+            // Обновляем отступы для EditText с учетом текущего состояния клавиатуры
+            val imeBottom = ViewCompat.getRootWindowInsets(binding.main)
+                ?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
+            updateEditTextPadding(imeBottom > 0, imeBottom)
+
             binding.previewButton.text = "Предпросмотр"
+
+            // Показываем клавиатуру
+            binding.contentEditText.requestFocus()
+            binding.contentEditText.postDelayed({
+                inputMethodManager.showSoftInput(binding.contentEditText, InputMethodManager.SHOW_IMPLICIT)
+            }, 50)
+
+            isPreviewVisible = false
+        } else {
+            // Переключаемся в режим предпросмотра
+
+            // Скрываем клавиатуру
+            inputMethodManager.hideSoftInputFromWindow(binding.contentEditText.windowToken, 0)
+
+            // Даем время на скрытие клавиатуры, затем показываем предпросмотр
+            binding.contentEditText.postDelayed({
+                binding.previewTextView.visibility = View.VISIBLE
+                binding.contentEditText.visibility = View.GONE
+
+                // Отступы для предпросмотра (клавиатура уже скрыта)
+                val paddingHorizontal = dpToPx(24)
+                val paddingTop = dpToPx(16)
+                val formattingBarHeight = binding.formattingBar.height
+                val paddingBottom = dpToPx(100) + formattingBarHeight
+
+                binding.previewTextView.setPadding(
+                    paddingHorizontal,
+                    paddingTop,
+                    paddingHorizontal,
+                    paddingBottom
+                )
+
+                markwon.setMarkdown(binding.previewTextView, binding.contentEditText.text.toString())
+                binding.previewButton.text = "Редактировать"
+
+                isPreviewVisible = true
+            }, 100)
         }
     }
 

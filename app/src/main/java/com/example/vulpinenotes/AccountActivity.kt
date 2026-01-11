@@ -69,7 +69,7 @@ class AccountActivity : BaseActivity() {
     private fun signOut() {
         auth.signOut()
         googleSignInClient.signOut()
-
+        Glide.get(this@AccountActivity).clearMemory()
         setResult(RESULT_OK)
         finish()
     }

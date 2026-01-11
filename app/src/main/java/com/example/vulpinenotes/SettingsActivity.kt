@@ -30,7 +30,7 @@ class SettingsActivity : BaseActivity() {
     private val KEY_NOTIFICATION_SETTINGS = "notification_settings"
 
     private lateinit var autoSyncSwitch: SwitchMaterial
-    private lateinit var notificationsSwitch: SwitchMaterial // Изменено здесь!
+    private lateinit var notificationsSwitch: SwitchMaterial
     private lateinit var selectBooksBtn: Button
     private lateinit var selectedBooksText: TextView
     private lateinit var selectIntervalBtn: Button
@@ -77,7 +77,7 @@ class SettingsActivity : BaseActivity() {
     }
 
     private fun bindViews() {
-        notificationsSwitch = findViewById(R.id.switch_notifications) // Теперь это SwitchMaterial
+        notificationsSwitch = findViewById(R.id.switch_notifications)
         selectBooksBtn = findViewById(R.id.btn_select_books)
         selectedBooksText = findViewById(R.id.tv_selected_books)
         selectIntervalBtn = findViewById(R.id.btn_select_interval)
