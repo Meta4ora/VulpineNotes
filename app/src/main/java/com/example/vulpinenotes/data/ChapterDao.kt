@@ -33,4 +33,7 @@ interface ChapterDao {
 
     @Query("SELECT COUNT(*) FROM chapters WHERE bookId = :bookId")
     suspend fun getChapterCount(bookId: String): Int
+
+    @Query("SELECT * FROM chapters WHERE bookId = :bookId ORDER BY position ASC")
+    suspend fun getChaptersForExport(bookId: String): List<ChapterEntity>
 }

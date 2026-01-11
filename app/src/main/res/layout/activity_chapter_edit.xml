@@ -30,13 +30,43 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 app:navigationIcon="@drawable/ic_close"
-                app:navigationContentDescription="Назад"
-                app:title="Редактировать главу"
-                app:titleTextColor="?attr/colorOnPrimary"
-                app:titleTextAppearance="@style/TextAppearance.Material3.TitleMedium"
-                style="@style/Widget.MaterialComponents.Toolbar.Primary"
                 android:paddingStart="16dp"
-                android:paddingEnd="16dp"/>
+                android:paddingEnd="16dp"
+                style="@style/Widget.MaterialComponents.Toolbar.Primary">
+
+                <TextView
+                    android:id="@+id/chapterTitleTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_gravity="center_vertical"/>
+
+                <ImageButton
+                    android:id="@+id/btnRedo"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:srcCompat="@drawable/ic_format_forward"
+                    app:tint="?attr/colorOnPrimary"
+                    android:layout_gravity="end"
+                    android:contentDescription="Отменить"/>
+
+                <ImageButton
+                    android:id="@+id/btnUndo"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:srcCompat="@drawable/ic_format_back"
+                    app:tint="?attr/colorOnPrimary"
+                    android:layout_gravity="end"
+                    android:contentDescription="Вернуть"/>
+
+            </androidx.appcompat.widget.Toolbar>
         </androidx.cardview.widget.CardView>
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -140,6 +170,28 @@
                         android:contentDescription="Подчёркивание"
                         android:layout_marginHorizontal="4dp"/>
 
+                    <!-- H1 -->
+                    <ImageButton
+                        android:id="@+id/btnH1"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_h1"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="H1"
+                        android:layout_marginHorizontal="4dp"/>
+
+                    <!-- H2 -->
+                    <ImageButton
+                        android:id="@+id/btnH2"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_h2"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="H2"
+                        android:layout_marginHorizontal="4dp"/>
+
                     <!-- H3 -->
                     <ImageButton
                         android:id="@+id/btnH3"
@@ -162,6 +214,35 @@
                         android:contentDescription="Список"
                         android:layout_marginHorizontal="4dp"/>
 
+                    <!-- Нумерованный список -->
+                    <ImageButton
+                        android:id="@+id/btnNumberList"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_list_numbered"
+                        app:tint="?attr/colorOnPrimary"
+                        android:layout_marginHorizontal="4dp"/>
+
+                    <!-- Таблица -->
+                    <ImageButton
+                        android:id="@+id/btnTable"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_table"
+                        app:tint="?attr/colorOnPrimary"
+                        android:layout_marginHorizontal="4dp"/>
+
+                    <!-- Разделитель -->
+                    <ImageButton
+                        android:id="@+id/btnDivider"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_divider"
+                        app:tint="?attr/colorOnPrimary"
+                        android:layout_marginHorizontal="4dp"/>
 
                     <!-- Цитата -->
                     <ImageButton
@@ -174,14 +255,25 @@
                         android:contentDescription="Цитата"
                         android:layout_marginHorizontal="4dp"/>
 
+                    <!-- Цитата -->
+                    <ImageButton
+                        android:id="@+id/btnClear"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:srcCompat="@drawable/ic_format_clear"
+                        app:tint="?attr/colorOnPrimary"
+                        android:contentDescription="Цитата"
+                        android:layout_marginHorizontal="4dp"/>
+
                 </LinearLayout>
             </HorizontalScrollView>
 
-            <!-- Фиксированная часть справа: разделитель + Предпросмотр -->
             <View
                 android:layout_width="1dp"
                 android:layout_height="40dp"
-                android:layout_marginHorizontal="12dp"/>
+                android:layout_marginHorizontal="12dp"
+                android:background="?attr/colorOnPrimary"/>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/previewButton"

@@ -24,6 +24,33 @@
     <string name="name_def">Гость</string>
     <string name="name_tip">Нажмите, чтобы войти</string>
 
+    <string name="local_mode">Локальный режим</string>
+    <string name="sign_in_to_sync">Для синхронизации с облаком войдите</string>
+    <string name="sign_in">Войти</string>
+    <string name="continue_locally">Продолжить локально</string>
+    <string name="book_added_locally_unauthorized">Книга добавлена локально (неавторизованный режим)</string>
+    <string name="new_book">Новая книга</string>
+    <string name="create">Создать</string>
+    <string name="enter_title_or_description">Введите название или описание</string>
+    <string name="at_least_one_field">Заполните хотя бы одно поле</string>
+    <string name="edit_book">Редактировать книгу</string>
+    <string name="sync_started">Синхронизация запущена...</string>
+    <string name="sign_in_required">Требуется вход</string>
+    <string name="book_added_locally">Книга добавлена локально</string>
+    <string name="book_added_synced">Книга добавлена и синхронизирована</string>
+    <string name="signed_out">Вы вышли из аккаунта</string>
+    <string name="created">Создано:</string>
+    <string name="updated">Обновлено:</string>
+    <string name="synced">Синхронизировано:</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
+    <string name="sync_error">Ошибка синхронизации:</string>
+    <string name="synced_books">Синхронизировано: %d книг</string>
+    <string name="require_login">Требуется вход</string>
+    <string name="login_for_cloud_sync">Войдите через Google, чтобы синхронизировать книги в облако.</string>
+    <string name="later">Позже</string>
+
+
 
     <!-- Добавление книги -->
     <string name="add_book">Добавить книгу</string>

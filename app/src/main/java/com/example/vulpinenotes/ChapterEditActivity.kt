@@ -13,16 +13,15 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.vulpinenotes.data.AppDatabase
-import com.example.vulpinenotes.data.toEntity
 import com.example.vulpinenotes.databinding.ActivityChapterEditBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import io.noties.markwon.Markwon
 import io.noties.markwon.html.HtmlPlugin
+import io.noties.markwon.ext.tables.TablePlugin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
 
 class ChapterEditActivity : AppCompatActivity() {
 
@@ -34,9 +33,9 @@ class ChapterEditActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityChapterEditBinding
     private lateinit var chapter: Chapter
-    private var position: Int = -1
+    private var position = -1
     private lateinit var bookId: String
-    private var bookCloudSynced: Boolean = false
+    private var bookCloudSynced = false
 
     private lateinit var database: AppDatabase
     private lateinit var firestore: FirebaseFirestore
@@ -44,6 +43,17 @@ class ChapterEditActivity : AppCompatActivity() {
     private lateinit var markwon: Markwon
 
     private var isPreviewVisible = false
+
+    // Undo/Redo с хранением текста + курсора
+    private data class EditState(val text: String, val cursor: Int)
+    private val undoStack = ArrayDeque<EditState>()
+    private val redoStack = ArrayDeque<EditState>()
+    private var isInternalChange = false // чтобы не писать состояние при Undo/Redo или автоподстановке
+
+    // Для отслеживания предыдущего состояния в TextWatcher
+    private var previousText = ""
+    private var previousCursor = 0
+    private var isTextChangedByUser = true
 
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,16 +63,28 @@ class ChapterEditActivity : AppCompatActivity() {
         binding = ActivityChapterEditBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Toolbar
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.apply {
+            setDisplayShowTitleEnabled(false)
+            setDisplayHomeAsUpEnabled(true)
+            setHomeAsUpIndicator(R.drawable.ic_close)
+        }
+
         database = AppDatabase.getDatabase(this)
         firestore = FirebaseFirestore.getInstance()
         auth = FirebaseAuth.getInstance()
 
-        // Markwon с поддержкой HTML (<u> для подчёркивания)
+        // Инициализация Markwon с поддержкой таблиц и HTML
         markwon = Markwon.builder(this)
             .usePlugin(HtmlPlugin.create())
+            .usePlugin(TablePlugin.create(this))
             .build()
 
-        // Получаем главу
+        initMarkwon()
+
+
+        // Получение данных
         chapter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(EXTRA_CHAPTER, Chapter::class.java)
         } else {
@@ -75,41 +97,88 @@ class ChapterEditActivity : AppCompatActivity() {
         bookCloudSynced = intent.getBooleanExtra("book_cloud_synced", false)
         if (position == -1) { finish(); return }
 
-        supportActionBar?.apply {
-            title = chapter.title
-            setDisplayHomeAsUpEnabled(true)
-            setHomeAsUpIndicator(R.drawable.ic_close)
-            setHomeButtonEnabled(true)
-        }
-
-        binding.toolbar.setNavigationOnClickListener { saveAndExit() }
-        binding.toolbar.setOnClickListener { showEditTitleDialog() }
-
+        binding.chapterTitleTextView.text = chapter.title
         binding.contentEditText.setText(chapter.content)
 
-        // Кнопки форматирования
-        binding.btnBold.setOnClickListener { applyFormat("**", "**") }
-        binding.btnItalic.setOnClickListener { applyFormat("_", "_") }
-        binding.btnUnderline.setOnClickListener { applyFormat("<u>", "</u>") }
+        // Инициализация состояния для undo/redo
+        saveStateToUndoStack()
 
-        // Кнопка предпросмотра
+        // Заголовок
+        binding.chapterTitleTextView.setOnClickListener { showEditTitleDialog() }
+        binding.toolbar.setNavigationOnClickListener { saveAndExit() }
+
+        // Форматирование
+        binding.btnBold.setOnClickListener { applyInline("**", "**") }
+        binding.btnItalic.setOnClickListener { applyInline("_", "_") }
+        binding.btnUnderline.setOnClickListener { applyInline("<u>", "</u>") }
+
+        binding.btnH1.setOnClickListener { applyLinePrefix("# ") }
+        binding.btnH2.setOnClickListener { applyLinePrefix("## ") }
+        binding.btnH3.setOnClickListener { applyLinePrefix("### ") }
+
+        binding.btnBulletList.setOnClickListener { applyList() }
+        binding.btnNumberList.setOnClickListener { applyNumberedList() }
+
+        binding.btnQuote.setOnClickListener { applyLinePrefix("> ") }
+
+        // Новые кнопки
+        binding.btnTable.setOnClickListener { showTableDialog() }
+        binding.btnDivider.setOnClickListener { insertDivider() }
+        binding.btnClear.setOnClickListener { clearFormatting() }
+
+        // Undo/Redo
+        binding.btnUndo.setOnClickListener { undo() }
+        binding.btnRedo.setOnClickListener { redo() }
+
+        // Preview
         binding.previewButton.setOnClickListener { togglePreview() }
 
-        // Сохранение при нажатии "назад"
+        // TextWatcher для Undo/Redo + автоподстановки списков
+        binding.contentEditText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+                previousText = binding.contentEditText.text.toString()
+                previousCursor = binding.contentEditText.selectionStart
+            }
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // Обработка автоподстановки списков
+                if (count == 1 && before == 0 && s != null) {
+                    val insertedChar = s.subSequence(start, start + count).toString()
+                    if (insertedChar == "\n") {
+                        handleListContinuation()
+                    }
+                }
+            }
+
+            override fun afterTextChanged(s: android.text.Editable?) {
+                if (isTextChangedByUser && !isInternalChange) {
+                    saveStateToUndoStack()
+                }
+                refreshPreview()
+            }
+        })
+
+        // Обработка клавиш для улучшенного управления списками
+        binding.contentEditText.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == android.view.KeyEvent.KEYCODE_ENTER &&
+                event.action == android.view.KeyEvent.ACTION_DOWN
+            ) {
+                handleListContinuation()
+                true // Поглощаем событие, так как сами вставляем текст
+            } else false
+        }
+
         onBackPressedDispatcher.addCallback(this) { saveAndExit() }
 
-        // Обработка оконных inset (IME и статус-бар)
+        // Insets
         binding.main.setOnApplyWindowInsetsListener { _, insets ->
-            val imeHeight = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
-            val statusBarHeight = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top
+            val ime = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
+            val status = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top
 
-            // Двигаем нижнюю панель
-            binding.formattingBar.translationY = -imeHeight.toFloat()
-
-            // Отступ для AppBar с учётом статус-бара
+            binding.formattingBar.translationY = -ime.toFloat()
             binding.appbar.setPadding(
                 binding.appbar.paddingLeft,
-                statusBarHeight,
+                status,
                 binding.appbar.paddingRight,
                 binding.appbar.paddingBottom
             )
@@ -117,17 +186,31 @@ class ChapterEditActivity : AppCompatActivity() {
         }
     }
 
+    private fun saveStateToUndoStack() {
+        if (!isInternalChange) {
+            val currentText = binding.contentEditText.text.toString()
+            val currentCursor = binding.contentEditText.selectionStart
+
+            // Сохраняем предыдущее состояние в стек undo
+            undoStack.addLast(EditState(previousText, previousCursor))
+            if (undoStack.size > 100) undoStack.removeFirst()
+            redoStack.clear() // Очищаем стек redo при новом действии пользователя
+
+            previousText = currentText
+            previousCursor = currentCursor
+        }
+    }
+
     private fun showEditTitleDialog() {
-        val input = EditText(this)
-        input.setText(chapter.title)
+        val input = EditText(this).apply { setText(chapter.title) }
         AlertDialog.Builder(this)
-            .setTitle("Редактировать заголовок")
+            .setTitle("Редактировать название главы")
             .setView(input)
             .setPositiveButton("Сохранить") { _, _ ->
-                val newTitle = input.text.toString().trim()
-                if (newTitle.isNotBlank()) {
-                    chapter = chapter.copy(title = newTitle)
-                    supportActionBar?.title = newTitle
+                val title = input.text.toString().trim()
+                if (title.isNotBlank()) {
+                    chapter = chapter.copy(title = title)
+                    binding.chapterTitleTextView.text = title
                 } else {
                     Toast.makeText(this, "Название не может быть пустым", Toast.LENGTH_SHORT).show()
                 }
@@ -136,24 +219,366 @@ class ChapterEditActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Применяем Markdown/HTML формат к выделенному тексту */
-    private fun applyFormat(prefix: String, suffix: String) {
-        val editText = binding.contentEditText
-        val start = editText.selectionStart.coerceAtLeast(0)
-        val end = editText.selectionEnd.coerceAtLeast(0)
-        val text = editText.text ?: return
+    private fun handleListContinuation() {
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val cursor = edit.selectionStart
+
+        // Находим начало текущей строки
+        val lineStart = text.lastIndexOf('\n', cursor - 1).let { if (it == -1) 0 else it + 1 }
+        val line = text.substring(lineStart, cursor)
+
+        // Получаем предыдущую строку для определения типа списка
+        val prevLineStart = text.lastIndexOf('\n', lineStart - 2).let {
+            if (it == -1) 0 else it + 1
+        }
+        val prevLine = text.substring(prevLineStart, lineStart - 1)
+
+        // Проверяем, является ли предыдущая строка элементом списка
+        val insertText: String? = when {
+            // Маркированный список: "- элемент" или "-"
+            prevLine.trimStart().matches(Regex("^-\\s.*")) -> {
+                // Если текущая строка пустая или содержит только "-", продолжаем список
+                if (line.trim().isEmpty() || line.trim() == "-") "\n- "
+                else null
+            }
+            // Нумерованный список: "1. элемент" или "1."
+            prevLine.trimStart().matches(Regex("^\\d+\\.\\s.*")) -> {
+                val numberMatch = Regex("^(\\d+)\\.").find(prevLine.trimStart())
+                if (numberMatch != null) {
+                    val number = numberMatch.groupValues[1].toIntOrNull() ?: 1
+                    if (line.trim().isEmpty() || line.trim().matches(Regex("^\\d+\\."))) {
+                        "\n${number + 1}. "
+                    } else null
+                } else null
+            }
+            // Цитата: "> текст"
+            prevLine.trimStart().startsWith("> ") -> {
+                if (line.trim().isEmpty()) "\n> "
+                else null
+            }
+            else -> null
+        }
+
+        insertText?.let {
+            isInternalChange = true
+            text.insert(cursor, it)
+            edit.setSelection(cursor + it.length)
+            isInternalChange = false
+        }
+    }
+
+    private fun undo() {
+        if (undoStack.isNotEmpty()) {
+            isInternalChange = true
+            // Сохраняем текущее состояние в стек redo
+            val currentState = EditState(
+                binding.contentEditText.text.toString(),
+                binding.contentEditText.selectionStart
+            )
+            redoStack.addLast(currentState)
+            if (redoStack.size > 100) redoStack.removeFirst()
+
+            // Восстанавливаем предыдущее состояние
+            val previousState = undoStack.removeLast()
+            binding.contentEditText.setText(previousState.text)
+
+            // Устанавливаем курсор на сохраненную позицию
+            val cursor = previousState.cursor.coerceIn(0, previousState.text.length)
+            binding.contentEditText.setSelection(cursor)
+
+            // Обновляем предыдущие значения
+            previousText = previousState.text
+            previousCursor = cursor
+
+            isInternalChange = false
+        }
+    }
+
+    private fun redo() {
+        if (redoStack.isNotEmpty()) {
+            isInternalChange = true
+            // Сохраняем текущее состояние в стек undo
+            val currentState = EditState(
+                binding.contentEditText.text.toString(),
+                binding.contentEditText.selectionStart
+            )
+            undoStack.addLast(currentState)
+            if (undoStack.size > 100) undoStack.removeFirst()
+
+            // Восстанавливаем состояние из redo
+            val nextState = redoStack.removeLast()
+            binding.contentEditText.setText(nextState.text)
+
+            // Устанавливаем курсор на сохраненную позицию
+            val cursor = nextState.cursor.coerceIn(0, nextState.text.length)
+            binding.contentEditText.setSelection(cursor)
+
+            // Обновляем предыдущие значения
+            previousText = nextState.text
+            previousCursor = cursor
+
+            isInternalChange = false
+        }
+    }
+
+    private fun applyInline(prefix: String, suffix: String) {
+        isTextChangedByUser = false
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val start = edit.selectionStart
+        val end = edit.selectionEnd
 
         if (start != end) {
             val selected = text.subSequence(start, end)
-            val replacement = "$prefix$selected$suffix"
-            text.replace(start, end, replacement)
-            editText.setSelection(start + prefix.length, start + prefix.length + selected.length)
+            text.replace(start, end, "$prefix$selected$suffix")
+            edit.setSelection(start + prefix.length, start + prefix.length + selected.length)
         } else {
             text.insert(start, "$prefix$suffix")
-            editText.setSelection(start + prefix.length)
+            edit.setSelection(start + prefix.length)
+        }
+        isTextChangedByUser = true
+        saveStateToUndoStack()
+        refreshPreview()
+    }
+
+    private fun applyLinePrefix(prefix: String) {
+        isTextChangedByUser = false
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val cursor = edit.selectionStart
+        val lineStart = text.lastIndexOf('\n', cursor - 1).let { if (it == -1) 0 else it + 1 }
+
+        text.insert(lineStart, prefix)
+        edit.setSelection(cursor + prefix.length)
+        isTextChangedByUser = true
+        saveStateToUndoStack()
+        refreshPreview()
+    }
+
+    private fun applyList() {
+        isTextChangedByUser = false
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val cursor = edit.selectionStart
+        text.insert(cursor, "- ")
+        edit.setSelection(cursor + 2)
+        isTextChangedByUser = true
+        saveStateToUndoStack()
+    }
+
+    private fun applyNumberedList() {
+        isTextChangedByUser = false
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val cursor = edit.selectionStart
+        text.insert(cursor, "1. ")
+        edit.setSelection(cursor + 3)
+        isTextChangedByUser = true
+        saveStateToUndoStack()
+    }
+
+    // ===================== ФУНКЦИЯ ДЛЯ ТАБЛИЦ =====================
+
+    private fun initMarkwon() {
+        markwon = Markwon.builder(this)
+            .usePlugin(HtmlPlugin.create())
+            .usePlugin(TablePlugin.create(this))
+            .build()
+    }
+
+    private fun showTableDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_table, null)
+        val etRows = dialogView.findViewById<EditText>(R.id.etRows)
+        val etCols = dialogView.findViewById<EditText>(R.id.etCols)
+
+        AlertDialog.Builder(this)
+            .setTitle("Вставить таблицу")
+            .setView(dialogView)
+            .setPositiveButton("Создать") { _, _ ->
+                val rows = etRows.text.toString().toIntOrNull() ?: 2
+                val cols = etCols.text.toString().toIntOrNull() ?: 2
+
+                // Проверяем корректность значений
+                if (rows < 1 || rows > 10 || cols < 1 || cols > 6) {
+                    Toast.makeText(
+                        this,
+                        "Укажите строки: 1-10, столбцы: 1-6",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+
+                insertTable(rows, cols)
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun insertTable(rows: Int, cols: Int) {
+        isTextChangedByUser = false
+
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val cursor = edit.selectionStart
+
+        val tableMarkdown = buildString {
+
+            // ❗ ОБЯЗАТЕЛЬНО: пустая строка перед таблицей
+            if (cursor > 0 && text[cursor - 1] != '\n') {
+                append("\n")
+            }
+            append("\n")
+
+            // Заголовки
+            append("|")
+            repeat(cols) { append(" Header ${it + 1} |") }
+            append("\n")
+
+            // Разделитель (КРИТИЧНО для Markwon)
+            append("|")
+            repeat(cols) { append(" --- |") }
+            append("\n")
+
+            // Данные
+            repeat(rows) { row ->
+                append("|")
+                repeat(cols) { col ->
+                    append(" ${row + 1}-${col + 1} |")
+                }
+                append("\n")
+            }
+
+            append("\n")
         }
 
-        if (isPreviewVisible) togglePreview()
+        text.insert(cursor, tableMarkdown)
+
+        // Курсор в первую ячейку данных
+        val firstCellOffset = tableMarkdown.indexOf("|", tableMarkdown.indexOf("\n") + 1) + 2
+        edit.setSelection((cursor + firstCellOffset).coerceAtMost(text.length))
+
+        isTextChangedByUser = true
+        saveStateToUndoStack()
+        refreshPreview()
+    }
+
+
+    // ===================== ФУНКЦИЯ ДЛЯ РАЗДЕЛИТЕЛЯ =====================
+    private fun insertDivider() {
+        isTextChangedByUser = false
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val cursor = edit.selectionStart
+
+        // Проверяем, нужно ли добавить переносы строк
+        val divider = buildString {
+            if (cursor > 0 && text[cursor - 1] != '\n') {
+                append("\n")
+            }
+            append("\n---\n\n")
+            if (cursor < text.length && text[cursor] != '\n') {
+                append("\n")
+            }
+        }
+
+        text.insert(cursor, divider)
+        // Ставим курсор после разделителя
+        edit.setSelection(cursor + divider.length - 1)
+
+        isTextChangedByUser = true
+        saveStateToUndoStack()
+        refreshPreview()
+    }
+
+    // ===================== УЛУЧШЕННАЯ ФУНКЦИЯ ДЛЯ ОЧИСТКИ ФОРМАТИРОВАНИЯ =====================
+    private fun clearFormatting() {
+        val edit = binding.contentEditText
+        val text = edit.text ?: return
+        val start = edit.selectionStart
+        val end = edit.selectionEnd
+
+        if (start == end) {
+            Toast.makeText(this, "Выделите текст для очистки форматирования", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Очистить форматирование")
+            .setMessage("Удалить все форматирование из выделенного текста?")
+            .setPositiveButton("Очистить") { _, _ ->
+                isTextChangedByUser = false
+                val selected = text.subSequence(start, end).toString()
+
+                // Улучшенная очистка форматирования
+                val plainText = selected
+                    // 1. Удаляем HTML теги (включая самозакрывающиеся)
+                    .replace(Regex("<[^>]+>"), "")
+                    // 2. Обработка ссылок Markdown [текст](url) -> текст
+                    .replace(Regex("\\[([^\\]]+)\\]\\([^)]+\\)")) { matchResult ->
+                        matchResult.groupValues[1]
+                    }
+                    // 3. Обработка изображений Markdown ![alt](url) -> alt
+                    .replace(Regex("!\\[([^\\]]*)\\]\\([^)]+\\)")) { matchResult ->
+                        matchResult.groupValues[1].ifEmpty { "" }
+                    }
+                    // 4. Обработка inline кода `код` -> код
+                    .replace(Regex("`([^`]+)`")) { matchResult ->
+                        matchResult.groupValues[1]
+                    }
+                    // 5. Обработка блоков кода ```язык\nкод\n``` -> код
+                    .replace(Regex("```[a-zA-Z]*\\n([\\s\\S]*?)\\n```")) { matchResult ->
+                        matchResult.groupValues[1]
+                    }
+                    // 6. Удаляем жирное форматирование **текст** -> текст
+                    .replace(Regex("\\*\\*([^*]+)\\*\\*")) { matchResult ->
+                        matchResult.groupValues[1]
+                    }
+                    // 7. Удаляем курсивное форматирование *текст* -> текст
+                    .replace(Regex("\\*([^*]+)\\*")) { matchResult ->
+                        matchResult.groupValues[1]
+                    }
+                    // 8. Удаляем курсивное форматирование _текст_ -> текст
+                    .replace(Regex("_([^_]+)_")) { matchResult ->
+                        matchResult.groupValues[1]
+                    }
+                    // 9. Удаляем зачеркнутое форматирование ~~текст~~ -> текст
+                    .replace(Regex("~~([^~]+)~~")) { matchResult ->
+                        matchResult.groupValues[1]
+                    }
+                    // 10. Удаляем маркеры заголовков #, ##, ### и т.д.
+                    .replace(Regex("^#{1,6}\\s+", RegexOption.MULTILINE), "")
+                    // 11. Удаляем маркеры списков в начале строки
+                    .replace(Regex("^[\\s]*[-*+]\\s+", RegexOption.MULTILINE), "")
+                    // 12. Удаляем нумерованные списки в начале строки
+                    .replace(Regex("^[\\s]*\\d+\\.\\s+", RegexOption.MULTILINE), "")
+                    // 13. Удаляем маркеры цитат в начале строки
+                    .replace(Regex("^>\\s+", RegexOption.MULTILINE), "")
+                    // 14. Обработка таблиц Markdown - преобразуем в простой текст
+                    .lines().joinToString("\n") { line ->
+                        if (line.matches(Regex("^\\|.*\\|$"))) {
+                            // Убираем начальные и конечные |, заменяем оставшиеся на пробелы
+                            line.trim('|')
+                                .split(Regex("\\|"))
+                                .joinToString("  ") { cell -> cell.trim() }
+                        } else {
+                            line
+                        }
+                    }
+                    // 15. Убираем лишние пробелы и переносы строк
+                    .replace(Regex("\\s+\\n"), "\n")
+                    .replace(Regex("\\n\\s+"), "\n")
+                    .trim()
+
+                text.replace(start, end, plainText)
+                edit.setSelection(start, start + plainText.length)
+
+                isTextChangedByUser = true
+                saveStateToUndoStack()
+                refreshPreview()
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 
     private fun togglePreview() {
@@ -170,45 +595,23 @@ class ChapterEditActivity : AppCompatActivity() {
         }
     }
 
-    private fun uploadChapterToCloud(chapterEntity: com.example.vulpinenotes.data.ChapterEntity) {
-        val user = auth.currentUser ?: return
-
-        val chapterForCloud = mapOf(
-            "chapterId" to chapterEntity.chapterId,
-            "title" to chapterEntity.title,
-            "description" to chapterEntity.description,
-            "date" to chapterEntity.date,
-            "wordCount" to chapterEntity.wordCount,
-            "isFavorite" to chapterEntity.isFavorite,
-            "position" to chapterEntity.position,
-            "createdAt" to chapterEntity.createdAt,
-            "updatedAt" to chapterEntity.updatedAt
-        )
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                firestore
-                    .collection("users")
-                    .document(user.uid)
-                    .collection("books")
-                    .document(bookId)
-                    .collection("chapters")
-                    .document(chapterEntity.chapterId)
-                    .set(chapterForCloud)
-                    .await()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+    private fun refreshPreview() {
+        if (isPreviewVisible) {
+            markwon.setMarkdown(
+                binding.previewTextView,
+                binding.contentEditText.text.toString()
+            )
         }
     }
+
 
     private fun saveAndExit() {
         val content = binding.contentEditText.text.toString().trim()
         val words = content.split(Regex("\\s+")).count { it.isNotEmpty() }
         val now = System.currentTimeMillis()
 
-        val updatedChapter = chapter.copy(
-            content = binding.contentEditText.text.toString().trim(),
+        val updated = chapter.copy(
+            content = content,
             wordCount = words,
             updatedAt = now
         )
@@ -218,27 +621,38 @@ class ChapterEditActivity : AppCompatActivity() {
                 .getChaptersForBookSync(bookId)
                 .firstOrNull { it.chapterId == chapter.chapterId } ?: return@launch
 
-            val entityUpdated = entity.copy(
-                content = updatedChapter.content,
-                wordCount = updatedChapter.wordCount,
-                updatedAt = updatedChapter.updatedAt
+            database.chapterDao().insertChapter(
+                entity.copy(
+                    title = updated.title,
+                    content = updated.content,
+                    wordCount = updated.wordCount,
+                    updatedAt = updated.updatedAt
+                )
             )
 
-            database.chapterDao().insertChapter(entityUpdated)
+            if (bookCloudSynced) uploadChapterToCloud(entity)
 
-            if (bookCloudSynced) {
-                uploadChapterToCloud(entityUpdated)
-            }
-
-            val resultIntent = Intent().apply {
-                putExtra(EXTRA_CHAPTER, updatedChapter)
+            setResult(RESULT_UPDATED_CHAPTER, Intent().apply {
+                putExtra(EXTRA_CHAPTER, updated)
                 putExtra(EXTRA_CHAPTER_POSITION, position)
-            }
-            setResult(RESULT_UPDATED_CHAPTER, resultIntent)
+            })
             finish()
         }
     }
 
+    private fun uploadChapterToCloud(entity: com.example.vulpinenotes.data.ChapterEntity) {
+        val user = auth.currentUser ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            firestore.collection("users")
+                .document(user.uid)
+                .collection("books")
+                .document(bookId)
+                .collection("chapters")
+                .document(entity.chapterId)
+                .set(entity)
+                .await()
+        }
+    }
 
     override fun onSupportNavigateUp(): Boolean {
         saveAndExit()

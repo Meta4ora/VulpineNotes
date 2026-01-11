@@ -1,4 +1,5 @@
 package com.example.vulpinenotes
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -13,6 +14,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.FileProvider
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
@@ -32,14 +34,29 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
+import com.itextpdf.html2pdf.HtmlConverter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
+import com.itextpdf.kernel.geom.PageSize
+import com.itextpdf.kernel.pdf.PdfDocument
+import com.itextpdf.kernel.pdf.PdfWriter
+import com.itextpdf.layout.Document
+import com.itextpdf.layout.element.Paragraph
+import com.itextpdf.layout.element.IBlockElement
+import com.itextpdf.layout.element.Div
+import com.itextpdf.layout.element.AreaBreak
+import com.itextpdf.layout.properties.AreaBreakType
+import com.itextpdf.layout.properties.TextAlignment
+
+
 class MainActivity : BaseActivity() {
+
     // UI
     private lateinit var booksRecyclerView: RecyclerView
     private lateinit var bookAdapter: BookAdapter
@@ -56,27 +73,39 @@ class MainActivity : BaseActivity() {
     private var currentBtnAddCover: Button? = null
     private var selectedImageFile: File? = null
     private lateinit var pickImageLauncher: ActivityResultLauncher<String>
+
     // Firebase
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
+
     // Room
     private lateinit var database: AppDatabase
     private lateinit var coversDir: File
+
     private val PREFS_NAME = "app_prefs"
     private val KEY_THEME = "app_theme"
+
+    // Export
+    private var selectedBookForExport: Book? = null
+    private var selectedExportFormat: String? = null
+    private val REQUEST_EXPORT = 1003
+
     companion object {
         private const val REQUEST_SETTINGS = 1001
         private const val REQUEST_ACCOUNT = 1002
         const val EXTRA_BOOK = "com.example.vulpinenotes.EXTRA_BOOK"
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySavedTheme()
         setContentView(R.layout.activity_main)
+
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
         database = AppDatabase.getDatabase(this)
         coversDir = File(filesDir, "covers").apply { mkdirs() }
+
         pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let { copyUriToCache(it) }?.let { file ->
                 selectedImageFile = file
@@ -87,31 +116,26 @@ class MainActivity : BaseActivity() {
                 currentBtnAddCover?.setText("Изменить обложку")
             }
         }
+
         initViews()
         setupRecyclerView()
         setupDrawer()
         setupSearch()
         setupBackPress()
         observeLocalBooks()
-        // при запуске проверяем авторизацию
+
+        showAddBookButton()
+        updateNavHeader()
+
         if (auth.currentUser != null) {
-            showAddBookButton()
-            updateNavHeader()
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val autoSync = prefs.getBoolean("auto_sync", true)
-
-            if (auth.currentUser != null) {
-                showAddBookButton()
-                updateNavHeader()
-                if (autoSync) {
-                    syncAllFromCloud(auth.currentUser!!)
-                }
+            if (autoSync) {
+                syncAllFromCloud(auth.currentUser!!)
             }
-        } else {
-            showAuthRequired()
-            updateNavHeader()
         }
     }
+
     private fun initViews() {
         drawerLayout = findViewById(R.id.drawer_layout)
         menuButton = findViewById(R.id.menu_button)
@@ -122,14 +146,16 @@ class MainActivity : BaseActivity() {
         booksRecyclerView = findViewById(R.id.books_recycler_view)
         findViewById<com.google.android.material.chip.Chip>(R.id.filter_chip)
             .setOnClickListener { showFilterMenu(it) }
-
     }
+
     private fun copyUriToCache(uri: Uri): File? {
         return try {
             val name = getFileName(uri) ?: "temp_cover_${System.currentTimeMillis()}.jpg"
             val file = File(cacheDir, name)
             contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(file).use { output -> input.copyTo(output) }
+                FileOutputStream(file).use { output ->
+                    input.copyTo(output)
+                }
             }
             file
         } catch (e: Exception) {
@@ -137,6 +163,7 @@ class MainActivity : BaseActivity() {
             null
         }
     }
+
     private fun getFileName(uri: Uri): String? {
         return if (uri.scheme == "content") {
             contentResolver.query(uri, null, null, null, null)?.use {
@@ -146,16 +173,14 @@ class MainActivity : BaseActivity() {
             }
         } else uri.lastPathSegment
     }
+
     private fun observeLocalBooks() {
         lifecycleScope.launch {
             database.bookDao().getAllBooks().collect { bookEntities ->
                 allBooks.clear()
 
                 bookEntities.forEach { entity ->
-                    // Пересчитываем реальное количество глав при загрузке (на случай несоответствия)
                     val realCount = database.bookDao().getRealChapterCount(entity.id)
-
-                    // Если счётчик в базе устарел — обновляем его
                     if (realCount != entity.chaptersCount) {
                         database.bookDao().updateChaptersCount(entity.id, realCount)
                     }
@@ -176,19 +201,17 @@ class MainActivity : BaseActivity() {
     private fun setupSearch() {
         searchEditText.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 clearButton.visibility = if (s.isNullOrBlank()) View.GONE else View.VISIBLE
                 filterBooks(s.toString())
             }
-
             override fun afterTextChanged(s: Editable?) {}
         })
 
         clearButton.setOnClickListener {
             searchEditText.text.clear()
             searchEditText.clearFocus()
-            filterBooks("") // сброс фильтра
+            filterBooks("")
         }
     }
 
@@ -199,100 +222,104 @@ class MainActivity : BaseActivity() {
             books.addAll(allBooks)
         } else {
             books.addAll(
-                allBooks.filter { book ->
-                    book.title.lowercase(Locale.getDefault()).contains(lowerQuery) ||
-                            book.desc.lowercase(Locale.getDefault()).contains(lowerQuery)
+                allBooks.filter {
+                    it.title.lowercase(Locale.getDefault()).contains(lowerQuery) ||
+                            it.desc.lowercase(Locale.getDefault()).contains(lowerQuery)
                 }
             )
         }
         sortBooks()
         bookAdapter.notifyDataSetChanged()
     }
-    private fun showAuthRequired() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Требуется вход")
-            .setMessage("Войдите через Google, чтобы синхронизировать книги в облако.")
-            .setPositiveButton("Войти") { _, _ ->
-                startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
-            }
-            .setNegativeButton("Позже") { d, _ -> d.dismiss() }
-            .setCancelable(false)
-            .show()
-        addBookButton.visibility = View.GONE
-    }
+
     private fun showAddBookButton() {
         addBookButton.visibility = View.VISIBLE
         addBookButton.setOnClickListener { showAddDialog() }
     }
+
     private fun showAddDialog() {
         val view = layoutInflater.inflate(R.layout.add_book_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.editText1)
         val editDesc = view.findViewById<TextInputEditText>(R.id.editText2)
         val switchUpload = view.findViewById<SwitchMaterial>(R.id.switchOptionCloud)
         currentCoverPreview = view.findViewById(R.id.coverPreview)
-        currentBtnAddCover = view.findViewById(R.id.btnAddCover)
+        currentBtnAddCover = view.findViewById<Button>(R.id.btnAddCover)
         selectedImageFile = null
         currentCoverPreview?.visibility = View.GONE
         currentBtnAddCover?.setText("Добавить обложку")
-        switchUpload?.isChecked = true
+
+        if (auth.currentUser != null) {
+            switchUpload?.visibility = View.VISIBLE
+            switchUpload?.isChecked = true
+        } else {
+            switchUpload?.visibility = View.GONE
+        }
+
         currentBtnAddCover?.setOnClickListener {
             pickImageLauncher.launch("image/*")
         }
-        MaterialAlertDialogBuilder(this)
+
+        MaterialAlertDialogBuilder(this@MainActivity)
             .setTitle("Новая книга")
             .setView(view)
             .setPositiveButton("Создать") { _, _ ->
                 val title = editTitle.text.toString().trim()
                 val desc = editDesc.text.toString().trim()
                 if (title.isBlank() && desc.isBlank()) {
-                    Toast.makeText(this, "Введите название или описание", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Введите название или описание", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
+
+                val uploadToCloud = auth.currentUser != null && switchUpload?.isChecked == true
+
                 addBookLocally(
                     title = title.ifBlank { "Без названия" },
                     desc = desc.ifBlank { "Нет описания" },
                     coverFile = selectedImageFile,
-                    uploadToCloud = switchUpload?.isChecked == true
+                    uploadToCloud = uploadToCloud
                 )
             }
             .setNegativeButton("Отмена", null)
             .show()
     }
+
     private fun showEditDialog(book: Book) {
         val view = layoutInflater.inflate(R.layout.edit_book_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.editText1)
         val editDesc = view.findViewById<TextInputEditText>(R.id.editText2)
         currentCoverPreview = view.findViewById(R.id.coverPreview)
-        currentBtnAddCover = view.findViewById(R.id.btnAddCover)
+        currentBtnAddCover = view.findViewById<Button>(R.id.btnAddCover)
         editTitle.setText(book.title)
         editDesc.setText(book.desc)
         selectedImageFile = null
+
         if (book.coverUri != null) {
             Glide.with(this)
                 .load(book.coverUri)
                 .placeholder(R.drawable.book_vector_placeholder)
                 .error(R.drawable.book_vector_placeholder)
-                .skipMemoryCache(true) // игнорируем память
-                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE) // игнорируем кэш на диске
+                .skipMemoryCache(true)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
                 .into(currentCoverPreview!!)
-
             currentCoverPreview?.visibility = View.VISIBLE
             currentBtnAddCover?.setText("Изменить обложку")
         } else {
             currentCoverPreview?.visibility = View.GONE
             currentBtnAddCover?.setText("Добавить обложку")
         }
+
         currentBtnAddCover?.setOnClickListener {
             pickImageLauncher.launch("image/*")
         }
-        MaterialAlertDialogBuilder(this)
+
+        MaterialAlertDialogBuilder(this@MainActivity)
             .setTitle("Редактировать книгу")
             .setView(view)
             .setPositiveButton("Сохранить") { _, _ ->
                 val newTitle = editTitle.text.toString().trim()
                 val newDesc = editDesc.text.toString().trim()
                 if (newTitle.isBlank() && newDesc.isBlank()) {
-                    Toast.makeText(this, "Заполните хотя бы одно поле", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Заполните хотя бы одно поле", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
                 updateBookLocally(
@@ -305,6 +332,7 @@ class MainActivity : BaseActivity() {
             .setNegativeButton("Отмена", null)
             .show()
     }
+
     private fun addBookLocally(title: String, desc: String, coverFile: File?, uploadToCloud: Boolean) {
         lifecycleScope.launch {
             val bookId = UUID.randomUUID().toString()
@@ -325,7 +353,6 @@ class MainActivity : BaseActivity() {
             )
             database.bookDao().insertBook(bookEntity)
 
-            // синхронизация с облаком без полей coverPath и cloudSynced
             if (uploadToCloud && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -333,13 +360,15 @@ class MainActivity : BaseActivity() {
                             .document(auth.currentUser!!.uid)
                             .collection("books")
                             .document(bookId)
-                            .set(hashMapOf(
-                                "title" to title,
-                                "desc" to desc,
-                                "chaptersCount" to 0,
-                                "createdAt" to bookEntity.createdAt,
-                                "updatedAt" to bookEntity.updatedAt
-                            )).await()
+                            .set(
+                                hashMapOf(
+                                    "title" to title,
+                                    "desc" to desc,
+                                    "chaptersCount" to 0,
+                                    "createdAt" to bookEntity.createdAt,
+                                    "updatedAt" to bookEntity.updatedAt
+                                )
+                            ).await()
                     }
                     database.bookDao().updateCloudState(bookId, true)
                     withContext(Dispatchers.Main) {
@@ -349,35 +378,35 @@ class MainActivity : BaseActivity() {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "Книга добавлена локально (нет сети)", Toast.LENGTH_LONG).show()
                     }
-                    Log.e("SYNC", "Не удалось синхронизировать при создании", e)
+                    Log.e("SYNC", "Не удалось синхронизировать", e)
                 }
             } else {
-                Toast.makeText(this@MainActivity, "Книга добавлена локально", Toast.LENGTH_SHORT).show()
+                val message = if (auth.currentUser == null) "Книга добавлена локально" else "Книга добавлена"
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
             }
         }
     }
+
     private fun updateBookLocally(bookId: String, newTitle: String, newDesc: String, newCoverFile: File?) {
         lifecycleScope.launch {
             val currentBook = database.bookDao().getBookById(bookId) ?: return@launch
 
             val finalCoverPath = newCoverFile?.let {
-                val destFile = File(coversDir, "cover_$bookId.jpg") // всегда одно имя на книгу
-                if (destFile.exists()) destFile.delete()           // удаляем старый файл
+                val destFile = File(coversDir, "cover_$bookId.jpg")
+                if (destFile.exists()) destFile.delete()
                 it.copyTo(destFile, overwrite = true)
                 destFile.absolutePath
             } ?: currentBook.coverPath
-
 
             val updatedBook = currentBook.copy(
                 title = newTitle,
                 desc = newDesc,
                 coverPath = finalCoverPath,
-                updatedAt = System.currentTimeMillis()  // обновляем только updatedAt
+                updatedAt = System.currentTimeMillis()
             )
 
-            database.bookDao().insertBook(updatedBook) // заменяем существующую запись
+            database.bookDao().insertBook(updatedBook)
 
-            // если синхронизировано с облаком
             if (currentBook.cloudSynced && auth.currentUser != null) {
                 try {
                     withContext(Dispatchers.IO) {
@@ -385,14 +414,16 @@ class MainActivity : BaseActivity() {
                             .document(auth.currentUser!!.uid)
                             .collection("books")
                             .document(bookId)
-                            .update(mapOf(
-                                "title" to newTitle,
-                                "desc" to newDesc,
-                                "updatedAt" to updatedBook.updatedAt
-                            )).await()
+                            .update(
+                                mapOf<String, Any>(                     // ← ЯВНО указываем тип
+                                    "title" to newTitle,
+                                    "desc" to newDesc,
+                                    "updatedAt" to updatedBook.updatedAt
+                                )
+                            ).await()
                     }
                 } catch (e: Exception) {
-                    Log.e("SYNC", "Не удалось обновить книгу в облаке", e)
+                    Log.e("SYNC", "Не удалось обновить в облаке", e)
                 }
             }
 
@@ -417,7 +448,7 @@ class MainActivity : BaseActivity() {
                     .collection("books")
                     .document(bookId)
                     .collection("chapters")
-                    .document(chapter.chapterId) // ✅
+                    .document(chapter.chapterId)
 
                 val cloudData = mapOf(
                     "chapterId" to chapter.chapterId,
@@ -433,11 +464,12 @@ class MainActivity : BaseActivity() {
                 batch.set(ref, cloudData)
             }
             batch.commit().await()
-            Log.d("SYNC", "Залито ${localChapters.size} глав для книги $bookId")
+            Log.d("SYNC", "Залито ${localChapters.size} глав")
         } catch (e: Exception) {
-            Log.e("SYNC", "Ошибка заливки глав книги $bookId", e)
+            Log.e("SYNC", "Ошибка заливки глав", e)
         }
     }
+
     private suspend fun downloadAllChaptersForBook(bookId: String, user: FirebaseUser) {
         try {
             val snapshot = db.collection("users")
@@ -449,32 +481,17 @@ class MainActivity : BaseActivity() {
                 .await()
 
             val cloudChapters = snapshot.documents.mapNotNull { doc ->
-                val chapter = doc.toObject(Chapter::class.java) ?: return@mapNotNull null
-
-                ChapterEntity(
-                    chapterId = chapter.chapterId,
-                    bookId = bookId,
-                    position = chapter.position,
-                    title = chapter.title,
-                    description = chapter.description,
-                    content = chapter.content,
-                    date = chapter.date,
-                    wordCount = chapter.wordCount,
-                    isFavorite = chapter.isFavorite,
-                    createdAt = chapter.createdAt,
-                    updatedAt = chapter.updatedAt
-                )
-
+                doc.toObject(ChapterEntity::class.java)?.copy(bookId = bookId)
             }
 
             if (cloudChapters.isNotEmpty()) {
                 withContext(Dispatchers.IO) {
                     database.chapterDao().insertChapters(cloudChapters)
                 }
-                Log.d("SYNC", "Скачано ${cloudChapters.size} глав для книги $bookId")
+                Log.d("SYNC", "Скачано ${cloudChapters.size} глав")
             }
         } catch (e: Exception) {
-            Log.e("SYNC", "Ошибка скачивания глав книги $bookId", e)
+            Log.e("SYNC", "Ошибка скачивания глав", e)
         }
     }
 
@@ -491,15 +508,10 @@ class MainActivity : BaseActivity() {
                     val cloudBook = doc.toObject(BookEntity::class.java)?.copy(id = doc.id) ?: continue
                     withContext(Dispatchers.IO) {
                         val localBook = database.bookDao().getBookById(cloudBook.id)
-                        // просто обновляем флаг — книга точно есть в облаке
                         database.bookDao().updateCloudState(cloudBook.id, true)
-                        // и сохраняем остальные поля (если их нет локально)
                         if (localBook == null) {
                             database.bookDao().insertBook(
-                                cloudBook.copy(
-                                    coverPath = null,
-                                    cloudSynced = true
-                                )
+                                cloudBook.copy(coverPath = null, cloudSynced = true)
                             )
                         } else {
                             database.bookDao().insertBook(
@@ -512,9 +524,7 @@ class MainActivity : BaseActivity() {
                             )
                         }
                     }
-                    // скачиваем главы из облака
                     downloadAllChaptersForBook(cloudBook.id, user)
-                    // заливаем локальные главы (если они новее или отсутствуют в облаке)
                     uploadAllChaptersForBook(cloudBook.id, user)
                     processed++
                 }
@@ -525,29 +535,32 @@ class MainActivity : BaseActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Ошибка синхронизации: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Ошибка синхронизации", Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
+
     private fun setupRecyclerView() {
         bookAdapter = BookAdapter(
             books,
             this,
             onShowInfo = { showBookInfo(it) },
             onEditBook = { book, _ -> showEditDialog(book) },
-            onBookClick = { startBookActivity(it) }
+            onBookClick = { startBookActivity(it) },
+            onExportBook = { book -> showExportDialog(book) }
         )
         booksRecyclerView.adapter = bookAdapter
         booksRecyclerView.layoutManager = GridLayoutManager(this, 2)
     }
+
     private fun startBookActivity(book: Book) {
         startActivity(Intent(this, BookActivity::class.java).putExtra(EXTRA_BOOK, book))
     }
+
     private fun showBookInfo(book: Book) {
         val v = layoutInflater.inflate(R.layout.dialog_book_info, null)
 
-        // обложка
         val cover = v.findViewById<ImageView>(R.id.dialogCover)
         if (book.coverUri != null) {
             Glide.with(this)
@@ -557,37 +570,628 @@ class MainActivity : BaseActivity() {
                 .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
                 .skipMemoryCache(true)
                 .into(cover)
-
             cover.visibility = View.VISIBLE
-        } else cover.visibility = View.GONE
+        } else {
+            cover.visibility = View.GONE
+        }
 
-        // Название и описание
         v.findViewById<TextView>(R.id.dialogTitle).text = book.title.ifBlank { "Без названия" }
         v.findViewById<TextView>(R.id.dialogAuthor).text = book.desc.ifBlank { getString(R.string.unknown_desc) }
+        v.findViewById<TextView>(R.id.dialogChaptersCount)?.text = "Количество глав: ${book.chaptersCount}"
 
-        // Количество глав
-        v.findViewById<TextView>(R.id.dialogChaptersCount)?.text =
-            "Количество глав: ${book.chaptersCount}"
-
-        // Дата создания и обновления
         val dateFormat = java.text.DateFormat.getDateTimeInstance()
-        v.findViewById<TextView>(R.id.dialogCreatedAt)?.text =
-            "Создано: ${dateFormat.format(book.createdAt)}"
-        v.findViewById<TextView>(R.id.dialogUpdatedAt)?.text =
-            "Обновлено: ${dateFormat.format(book.updatedAt)}"
-
-        // Статус синхронизации
+        v.findViewById<TextView>(R.id.dialogCreatedAt)?.text = "Создано: ${dateFormat.format(book.createdAt)}"
+        v.findViewById<TextView>(R.id.dialogUpdatedAt)?.text = "Обновлено: ${dateFormat.format(book.updatedAt)}"
         v.findViewById<TextView>(R.id.dialogCloudSynced)?.text =
             "Синхронизировано: ${if (book.cloudSynced) "Да" else "Нет"}"
 
-        // Показываем диалог
-        MaterialAlertDialogBuilder(this, R.style.CustomAlertDialogTheme)
+        MaterialAlertDialogBuilder(this@MainActivity, R.style.CustomAlertDialogTheme)
             .setTitle(R.string.info)
             .setView(v)
             .setPositiveButton("OK") { d, _ -> d.dismiss() }
+            .setNeutralButton("Экспорт") { _, _ -> showExportDialog(book) }
             .show()
     }
 
+    // Вспомогательная функция для экранирования HTML
+    private fun escapeHtml(text: String): String {
+        return text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
+    }
+
+    // Вызывается после выбора книги для экспорта
+    private fun showExportDialog(book: Book) {
+        val formats = arrayOf("PDF", "Markdown")
+        MaterialAlertDialogBuilder(this@MainActivity)
+            .setTitle("Экспорт книги")
+            .setItems(formats) { _, which ->
+                val type = if (which == 0) "pdf" else "md"
+                val mime = if (type == "pdf") "application/pdf" else "text/markdown"
+                val ext = type
+
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    this.type = mime
+                    putExtra(Intent.EXTRA_TITLE, "${book.title}.$ext")
+                }
+
+                selectedBookForExport = book
+                selectedExportFormat = type
+                startActivityForResult(intent, REQUEST_EXPORT)
+            }
+            .show()
+    }
+
+    private suspend fun generateExportContent(book: Book, format: String): ByteArray =
+        withContext(Dispatchers.IO) {
+            try {
+                val chapters = database.chapterDao().getChaptersForExport(book.id)
+                if (chapters.isNullOrEmpty()) throw IllegalStateException("В книге нет глав для экспорта")
+
+                val sortedChapters = chapters.sortedBy { it.position }
+                val dateFormat = java.text.DateFormat.getDateTimeInstance()
+
+                // Markdown контент
+                val markdownContent = buildString {
+                    appendLine("# ${book.title}\n")
+                    appendLine("**Описание:** ${book.desc.ifBlank { "Нет описания" }}\n")
+                    appendLine("**Создано:** ${dateFormat.format(Date(book.createdAt))}\n")
+                    appendLine("---\n")
+                    for ((index, chapter) in sortedChapters.withIndex()) {
+                        // Добавляем специальный разделитель между главами
+                        if (index > 0) {
+                            appendLine("# ##") // Специальный маркер для разрыва страницы
+                        }
+                        appendLine("## ${chapter.title}\n")
+                        appendLine(chapter.content)
+                        appendLine("\n")
+                    }
+                }
+
+                when (format.lowercase()) {
+                    "md", "markdown" -> markdownContent.toByteArray(Charsets.UTF_8)
+
+                    "pdf" -> {
+                        // Получаем HTML
+                        val htmlContent = markdownToHtml(markdownContent)
+
+                        // Конвертируем HTML в PDF с улучшенной обработкой
+                        ByteArrayOutputStream().use { outputStream ->
+                            PdfWriter(outputStream).use { writer ->
+                                PdfDocument(writer).use { pdfDoc ->
+                                    pdfDoc.defaultPageSize = PageSize.A4
+
+                                    // Создаем конвертер с настройками
+                                    val converterProperties = com.itextpdf.html2pdf.ConverterProperties().apply {
+                                        setBaseUri("") // Указываем пустой базовый URI
+                                        setCreateAcroForm(false)
+                                    }
+
+                                    // Конвертируем HTML в PDF
+                                    HtmlConverter.convertToPdf(htmlContent, pdfDoc, converterProperties)
+
+                                    // Добавляем footer на каждую страницу
+                                    addFooterToAllPages(pdfDoc, book.title)
+                                }
+                            }
+                            outputStream.toByteArray()
+                        }
+                    }
+
+                    else -> byteArrayOf()
+                }
+            } catch (e: Exception) {
+                Log.e("EXPORT", "Ошибка генерации контента: ${e.message}", e)
+                // Возвращаем PDF с сообщением об ошибке
+                if (format.lowercase() == "pdf") {
+                    return@withContext createErrorPdf(e.message ?: "Неизвестная ошибка")
+                }
+                throw e
+            }
+        }
+
+    // ДОБАВЬ эту функцию для добавления footer на все страницы
+    private fun addFooterToAllPages(pdfDoc: PdfDocument, bookTitle: String) {
+        try {
+            val totalPages = pdfDoc.numberOfPages
+            for (i in 1..totalPages) {
+                val page = pdfDoc.getPage(i)
+                val pageSize = page.pageSize
+
+                // Создаем новую Document для добавления footer
+                Document(pdfDoc, pageSize as PageSize?, false).use { doc ->
+                    val footerText = "Страница $i из $totalPages | Сделано в Vulpine Notes"
+                    val footer = Paragraph(footerText)
+                        .setFontSize(9f)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFixedPosition(
+                            pageSize.left + 20,
+                            pageSize.bottom + 10,
+                            pageSize.width - 40
+                        )
+
+                    doc.add(footer)
+                    doc.close()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PDF", "Ошибка добавления footer: ${e.message}", e)
+        }
+    }
+
+    // ДОБАВЬ эту вспомогательную функцию для создания PDF с ошибкой
+    private fun createErrorPdf(errorMessage: String): ByteArray {
+        return ByteArrayOutputStream().use { outputStream ->
+            PdfWriter(outputStream).use { writer ->
+                PdfDocument(writer).use { pdfDoc ->
+                    Document(pdfDoc).use { document ->
+                        pdfDoc.defaultPageSize = PageSize.A4
+
+                        document.add(Paragraph("Ошибка при экспорте книги")
+                            .setFontSize(16f)
+                            .setBold()
+                            .setTextAlignment(TextAlignment.CENTER))
+
+                        document.add(Paragraph("\n"))
+
+                        document.add(Paragraph("Произошла ошибка при создании PDF файла:")
+                            .setFontSize(12f))
+
+                        document.add(Paragraph(errorMessage)
+                            .setFontSize(10f)
+                            .setItalic()
+                            .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY))
+
+                        document.add(Paragraph("\n\n"))
+
+                        document.add(Paragraph("Сделано в Vulpine Notes")
+                            .setFontSize(10f)
+                            .setTextAlignment(TextAlignment.CENTER))
+                    }
+                }
+            }
+            outputStream.toByteArray()
+        }
+    }
+
+    // ОБНОВИ функцию markdownToHtml для правильной обработки разрывов страниц
+    // ЗАМЕНИ функцию markdownToHtml полностью:
+    private fun markdownToHtml(markdown: String): String {
+        val sb = StringBuilder()
+        val lines = markdown.lines()
+        var inTable = false
+        var inCodeBlock = false
+        var inQuote = false
+        var inUl = false
+        var inOl = false
+        var emptyLineCount = 0
+        var chapterCount = 0
+        var isTitlePagePassed = false
+        var previousLineWasH1 = false
+
+        // Для обработки таблиц
+        var tableRows = mutableListOf<List<String>>()
+        var isHeaderRow = false
+
+        sb.append("<!DOCTYPE html>")
+        sb.append("<html><head><meta charset=\"UTF-8\">")
+        sb.append("<style>")
+        // Основные стили
+        sb.append("body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }")
+        sb.append("h1 { border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 20px; }")
+        sb.append("h2 { margin-top: 30px; padding-top: 20px; border-bottom: 1px solid #ddd; }")
+        sb.append("h3 { margin-top: 25px; }")
+        sb.append("p { margin: 8px 0; }")
+        sb.append("em { font-style: italic; }")
+        sb.append("strong { font-weight: bold; }")
+        sb.append("u { text-decoration: underline; }")
+        sb.append("del { text-decoration: line-through; }")
+        sb.append("pre { background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 10px 0; white-space: pre-wrap; }")
+        sb.append("code { font-family: 'Courier New', monospace; background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }")
+        sb.append("blockquote { border-left: 3px solid #ccc; padding-left: 15px; margin: 10px 0; color: #666; }")
+        sb.append("table { border-collapse: collapse; margin: 15px 0; width: 100%; }")
+        sb.append("td, th { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }")
+        sb.append("th { background-color: #f2f2f2; font-weight: bold; }")
+        sb.append("hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }")
+        sb.append("ul, ol { margin: 10px 0; padding-left: 25px; }")
+        sb.append("li { margin: 5px 0; }")
+        sb.append("img { max-width: 100%; height: auto; }")
+
+        // Убрали page-break-before из заголовков
+        sb.append("h1, h2, h3 { page-break-before: avoid; page-break-after: avoid; }")
+
+        // Специальный класс для разрыва между главой и контентом
+        sb.append(".chapter-break { page-break-before: always; }")
+
+        // Стиль для заглавной страницы
+        sb.append(".title-page { text-align: center; margin-top: 100px; }")
+        sb.append(".title-page h1 { border: none; font-size: 24pt; }")
+        sb.append(".title-page p { font-size: 14pt; color: #666; }")
+        sb.append("</style></head><body>")
+
+        // Функция для применения inline разметки
+        fun applyInlineMarkdown(text: String): String {
+            var t = text
+
+            // Обрабатываем HTML-тег подчеркивания <u>текст</u>
+            t = Regex("<u>(.*?)</u>", RegexOption.DOT_MATCHES_ALL).replace(t) {
+                "<u>${it.groupValues[1]}</u>"
+            }
+
+            // Временная замена <u> тегов на плейсхолдеры
+            val uTags = mutableListOf<Pair<String, String>>()
+            var tagIndex = 0
+
+            t = Regex("<u>.*?</u>").replace(t) { match ->
+                val placeholder = "%%%U_TAG_${tagIndex}%%%"
+                uTags.add(placeholder to match.value)
+                tagIndex++
+                placeholder
+            }
+
+            // Экранируем HTML
+            t = t.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;")
+
+            // Восстанавливаем <u> теги
+            for ((placeholder, original) in uTags) {
+                t = t.replace(placeholder, original)
+            }
+
+            // Жирный **текст**
+            t = Regex("\\*\\*(.*?)\\*\\*").replace(t) { "<strong>${it.groupValues[1]}</strong>" }
+            // Курсив *текст* или _текст_
+            t = Regex("\\*(.*?)\\*").replace(t) { "<em>${it.groupValues[1]}</em>" }
+            t = Regex("_(.*?)_").replace(t) { "<em>${it.groupValues[1]}</em>" }
+            // Зачёркнутый ~~текст~~
+            t = Regex("~~(.*?)~~").replace(t) { "<del>${it.groupValues[1]}</del>" }
+            // Inline код `код`
+            t = Regex("`([^`]+)`").replace(t) { "<code>${it.groupValues[1]}</code>" }
+
+            // Ссылки [текст](url)
+            t = Regex("\\[([^\\]]+)\\]\\(([^\\)]+)\\)").replace(t) {
+                "<a href=\"${it.groupValues[2]}\">${it.groupValues[1]}</a>"
+            }
+
+            // Изображения ![alt](url)
+            t = Regex("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)").replace(t) {
+                val alt = it.groupValues[1].ifEmpty { "Image" }
+                "<img src=\"${it.groupValues[2]}\" alt=\"$alt\" />"
+            }
+
+            return t
+        }
+
+        // Функция для закрытия всех активных блоков
+        fun closeActiveBlocks() {
+            if (inUl) {
+                sb.append("</ul>")
+                inUl = false
+            }
+            if (inOl) {
+                sb.append("</ol>")
+                inOl = false
+            }
+            if (inTable) {
+                // Закрываем таблицу
+                if (tableRows.isNotEmpty()) {
+                    sb.append("<table>")
+                    for ((index, row) in tableRows.withIndex()) {
+                        if (index == 0 && isHeaderRow) {
+                            sb.append("<tr>")
+                            for (cell in row) {
+                                sb.append("<th>${applyInlineMarkdown(cell)}</th>")
+                            }
+                            sb.append("</tr>")
+                        } else {
+                            sb.append("<tr>")
+                            for (cell in row) {
+                                sb.append("<td>${applyInlineMarkdown(cell)}</td>")
+                            }
+                            sb.append("</tr>")
+                        }
+                    }
+                    sb.append("</table>")
+                }
+                tableRows.clear()
+                inTable = false
+                isHeaderRow = false
+            }
+            if (inQuote) {
+                sb.append("</blockquote>")
+                inQuote = false
+            }
+            emptyLineCount = 0
+        }
+
+        // Обработка строк
+        for (i in lines.indices) {
+            val line = lines[i]
+            val trimmedLine = line.trim()
+            val nextLine = if (i + 1 < lines.size) lines[i + 1].trim() else ""
+
+            when {
+                // СПЕЦИАЛЬНЫЙ РАЗДЕЛИТЕЛЬ ДЛЯ РАЗРЫВА СТРАНИЦ (# ##)
+                trimmedLine == "# ##" -> {
+                    closeActiveBlocks()
+                    // Добавляем div с классом для разрыва страницы
+                    sb.append("<div class=\"chapter-break\"></div>")
+                    emptyLineCount = 0
+                    continue
+                }
+
+                // Блоки кода ```
+                trimmedLine.startsWith("```") -> {
+                    inCodeBlock = !inCodeBlock
+                    if (inCodeBlock) {
+                        closeActiveBlocks()
+                        sb.append("<pre><code>")
+                    } else {
+                        sb.append("</code></pre>")
+                    }
+                    emptyLineCount = 0
+                }
+                inCodeBlock -> {
+                    sb.append(applyInlineMarkdown(line)).append("\n")
+                    emptyLineCount = 0
+                }
+
+                // Разделители (hr) - обычные
+                trimmedLine.matches(Regex("^---+$")) -> {
+                    closeActiveBlocks()
+                    sb.append("<hr/>")
+                    emptyLineCount = 0
+                }
+
+                // Заголовки
+                trimmedLine.startsWith("### ") -> {
+                    closeActiveBlocks()
+                    sb.append("<h3>${applyInlineMarkdown(trimmedLine.substring(4).trim())}</h3>")
+                    emptyLineCount = 0
+                    previousLineWasH1 = false
+                }
+                trimmedLine.startsWith("## ") -> {
+                    closeActiveBlocks()
+
+                    // Если это первая глава после заглавной страницы, добавляем разрыв
+                    if (isTitlePagePassed && chapterCount == 0) {
+                        sb.append("<div class=\"chapter-break\"></div>")
+                    }
+
+                    sb.append("<h2>${applyInlineMarkdown(trimmedLine.substring(3).trim())}</h2>")
+                    emptyLineCount = 0
+                    previousLineWasH1 = false
+                    chapterCount++
+                }
+                trimmedLine.startsWith("# ") -> {
+                    closeActiveBlocks()
+
+                    if (!isTitlePagePassed) {
+                        // Это заглавная страница книги
+                        sb.append("<div class=\"title-page\">")
+                        sb.append("<h1>${applyInlineMarkdown(trimmedLine.substring(2).trim())}</h1>")
+                        isTitlePagePassed = true
+                        previousLineWasH1 = true
+                    } else {
+                        // Это другой H1 заголовок (возможно, в содержании)
+                        sb.append("<h1>${applyInlineMarkdown(trimmedLine.substring(2).trim())}</h1>")
+                        previousLineWasH1 = true
+                    }
+                    emptyLineCount = 0
+                }
+
+                // Закрываем div заглавной страницы при следующем не-пустом элементе после H1
+                previousLineWasH1 && trimmedLine.isNotEmpty() && !trimmedLine.startsWith("#") -> {
+                    if (isTitlePagePassed && chapterCount == 0) {
+                        // Завершаем заглавную страницу
+                        sb.append("</div>")
+                        // Добавляем разрыв перед первой главой
+                        sb.append("<div class=\"chapter-break\"></div>")
+                    }
+                    previousLineWasH1 = false
+                    // Не используем return@when - продолжаем обработку этой же строки
+                }
+
+                // Таблицы (должно быть после проверки заголовков)
+                line.contains("|") && !inCodeBlock && !trimmedLine.startsWith(">") -> {
+                    // Проверяем, есть ли символы | в начале и конце или нет
+                    val cleanLine = line.trim()
+                    if (cleanLine.startsWith("|") || cleanLine.endsWith("|")) {
+                        val cells = cleanLine.trim('|').split("|").map { it.trim() }
+
+                        if (!inTable) {
+                            // Если это начало таблицы, закрываем предыдущие блоки
+                            closeActiveBlocks()
+                            inTable = true
+                            tableRows.clear()
+                        }
+
+                        // Проверяем, является ли это разделительной строкой
+                        val isSeparator = cells.all { cell -> cell.matches(Regex("^:?---+:?$")) }
+
+                        if (isSeparator) {
+                            isHeaderRow = true
+                        } else {
+                            tableRows.add(cells)
+                        }
+
+                        emptyLineCount = 0
+                        continue
+                    }
+                }
+
+                // Цитаты
+                trimmedLine.startsWith("> ") -> {
+                    val quoteContent = applyInlineMarkdown(trimmedLine.substring(2).trim())
+                    if (!inQuote) {
+                        closeActiveBlocks()
+                        sb.append("<blockquote>")
+                        inQuote = true
+                    } else {
+                        sb.append("<br/>")
+                    }
+                    sb.append("<p>$quoteContent</p>")
+                    emptyLineCount = 0
+
+                    // Закрываем цитату, если следующая строка не цитата
+                    if (nextLine.isNotEmpty() && !nextLine.startsWith("> ")) {
+                        sb.append("</blockquote>")
+                        inQuote = false
+                    }
+                }
+
+                // Маркированные списки
+                trimmedLine.matches(Regex("^[-*+]\\s+.*")) -> {
+                    val listItem = applyInlineMarkdown(trimmedLine.substring(2).trim())
+                    if (!inUl) {
+                        closeActiveBlocks()
+                        sb.append("<ul>")
+                        inUl = true
+                    }
+                    sb.append("<li>$listItem</li>")
+                    emptyLineCount = 0
+
+                    // Закрываем список, если следующая строка не элемент списка
+                    if (nextLine.isNotEmpty() && !nextLine.matches(Regex("^[-*+]\\s+.*"))
+                        && !nextLine.matches(Regex("^\\d+\\.\\s+.*"))
+                        && !nextLine.matches(Regex("^\\s+[-*+\\d]\\s+.*"))) {
+                        sb.append("</ul>")
+                        inUl = false
+                    }
+                }
+
+                // Нумерованные списки
+                trimmedLine.matches(Regex("^\\d+\\.\\s+.*")) -> {
+                    // Извлекаем содержимое (без номера)
+                    val listItemContent = trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim()
+                    val listItem = applyInlineMarkdown(listItemContent)
+
+                    if (!inOl) {
+                        closeActiveBlocks()
+                        sb.append("<ol>")
+                        inOl = true
+                    }
+                    sb.append("<li>$listItem</li>")
+                    emptyLineCount = 0
+
+                    // Закрываем список, если следующая строка не элемент списка
+                    if (nextLine.isNotEmpty() && !nextLine.matches(Regex("^\\d+\\.\\s+.*"))
+                        && !nextLine.matches(Regex("^[-*+]\\s+.*"))
+                        && !nextLine.matches(Regex("^\\s+[-*+\\d]\\s+.*"))) {
+                        sb.append("</ol>")
+                        inOl = false
+                    }
+                }
+
+                // Пустые строки
+                trimmedLine.isEmpty() -> {
+                    emptyLineCount++
+
+                    // Если мы в таблице и встречаем пустую строку, закрываем таблицу
+                    if (inTable) {
+                        closeActiveBlocks()
+                    }
+
+                    // Если два пустых строки подряд и мы в списке, закрываем его
+                    if (emptyLineCount >= 2) {
+                        if (inUl) {
+                            sb.append("</ul>")
+                            inUl = false
+                        }
+                        if (inOl) {
+                            sb.append("</ol>")
+                            inOl = false
+                        }
+                        if (inQuote) {
+                            sb.append("</blockquote>")
+                            inQuote = false
+                        }
+                    } else if (i > 0 && lines[i-1].trim().isNotEmpty() && !inCodeBlock) {
+                        sb.append("<br/>")
+                    }
+                }
+
+                // Обычный текст (абзацы)
+                else -> {
+                    // Если предыдущая строка была пустой и мы не в активных блоках,
+                    // начинаем новый абзац
+                    if (emptyLineCount > 0 && !inUl && !inOl && !inQuote && !inTable && !inCodeBlock) {
+                        sb.append("<p>${applyInlineMarkdown(line)}</p>")
+                    } else if (!inUl && !inOl && !inQuote && !inTable && !inCodeBlock) {
+                        // Проверяем, продолжается ли предыдущий абзац
+                        val isContinuation = i > 0 &&
+                                lines[i-1].trim().isNotEmpty() &&
+                                !lines[i-1].trim().startsWith("#") &&
+                                !lines[i-1].trim().startsWith(">") &&
+                                !lines[i-1].trim().matches(Regex("^[-*+]\\s+.*")) &&
+                                !lines[i-1].trim().matches(Regex("^\\d+\\.\\s+.*")) &&
+                                !lines[i-1].trim().matches(Regex("^---+$"))
+
+                        if (isContinuation) {
+                            sb.append("<br/>${applyInlineMarkdown(line)}")
+                        } else {
+                            sb.append("<p>${applyInlineMarkdown(line)}</p>")
+                        }
+                    } else if (inTable || inCodeBlock || inQuote) {
+                        // Внутри специальных блоков просто добавляем текст
+                        sb.append(applyInlineMarkdown(line))
+                        if (inCodeBlock) sb.append("\n")
+                    }
+                    emptyLineCount = 0
+                    previousLineWasH1 = false
+                }
+            }
+        }
+
+        // Закрываем все незакрытые блоки в конце
+        closeActiveBlocks()
+        if (inCodeBlock) sb.append("</code></pre>")
+        if (inQuote) sb.append("</blockquote>")
+        if (inUl) sb.append("</ul>")
+        if (inOl) sb.append("</ol>")
+
+        // Закрываем div заглавной страницы, если он еще открыт
+        if (previousLineWasH1) {
+            sb.append("</div>")
+        }
+
+        sb.append("</body></html>")
+        return sb.toString()
+    }
+
+    // Обработка результата экспорта
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            val book = selectedBookForExport ?: return
+            val format = selectedExportFormat ?: return
+
+            lifecycleScope.launch {
+                try {
+                    val content = generateExportContent(book, format)
+                    contentResolver.openOutputStream(uri)?.use { it.write(content) }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Экспорт завершён", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Ошибка экспорта: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+
+            selectedBookForExport = null
+            selectedExportFormat = null
+        }
+    }
 
     private fun showFilterMenu(anchor: View) {
         val popup = PopupMenu(this, anchor)
@@ -611,26 +1215,18 @@ class MainActivity : BaseActivity() {
             sortBooks()
             true
         }
-
         popup.show()
     }
 
     private fun updateFilterChip(text: String) {
-        val chip = findViewById<com.google.android.material.chip.Chip>(R.id.filter_chip)
-        chip.text = text
+        findViewById<com.google.android.material.chip.Chip>(R.id.filter_chip).text = text
     }
 
     private fun sortBooks() {
         when (currentSortType) {
-            SortType.TITLE -> {
-                books.sortBy { it.title.lowercase(Locale.getDefault()) }
-            }
-            SortType.UPDATED_AT -> {
-                books.sortByDescending { it.updatedAt }
-            }
-            SortType.CREATED_AT -> {
-                books.sortByDescending { it.createdAt }
-            }
+            SortType.TITLE -> books.sortBy { it.title.lowercase(Locale.getDefault()) }
+            SortType.UPDATED_AT -> books.sortByDescending { it.updatedAt }
+            SortType.CREATED_AT -> books.sortByDescending { it.createdAt }
         }
         bookAdapter.notifyDataSetChanged()
     }
@@ -666,57 +1262,31 @@ class MainActivity : BaseActivity() {
             }
         })
     }
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_ACCOUNT && resultCode == RESULT_OK) {
-            if (auth.currentUser != null) {
-                syncAllFromCloud(auth.currentUser!!)
-                showAddBookButton()
-            } else {
-                addBookButton.visibility = View.GONE
-                Toast.makeText(this, "Вы вышли из аккаунта", Toast.LENGTH_SHORT).show()
-            }
 
-            updateNavHeader()
-        }
-
-        if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK) {
-            recreate()
-
-            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val autoSync = prefs.getBoolean("auto_sync", true)
-
-            if (auth.currentUser != null && autoSync) {
-                syncAllFromCloud(auth.currentUser!!)
-            }
-        }
-
-    }
     private fun updateNavHeader() {
         val headerView = navView.getHeaderView(0)
         val avatar = headerView.findViewById<ShapeableImageView>(R.id.nav_header_avatar)
         val name = headerView.findViewById<TextView>(R.id.nav_header_name)
         val email = headerView.findViewById<TextView>(R.id.nav_header_email)
         val user = auth.currentUser
+
         if (user != null) {
             name.text = user.displayName ?: "Пользователь"
             email.text = user.email ?: ""
             user.photoUrl?.let { Glide.with(this).load(it).placeholder(R.drawable.ic_fox_logo).into(avatar) }
                 ?: avatar.setImageResource(R.drawable.ic_fox_logo)
-            headerView.setOnClickListener {
-                drawerLayout.closeDrawer(GravityCompat.START)
-                startActivity(Intent(this, AccountActivity::class.java))
-            }
         } else {
-            name.text = getString(R.string.name_def)
-            email.text = getString(R.string.name_tip)
+            name.text = "Локальный режим"
+            email.text = "Войдите для синхронизации"
             avatar.setImageResource(R.drawable.ic_fox_logo)
-            headerView.setOnClickListener {
-                drawerLayout.closeDrawer(GravityCompat.START)
-                startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
-            }
+        }
+
+        headerView.setOnClickListener {
+            drawerLayout.closeDrawer(GravityCompat.START)
+            startActivityForResult(Intent(this, AccountActivity::class.java), REQUEST_ACCOUNT)
         }
     }
+
     private fun applySavedTheme() {
         val mode = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)

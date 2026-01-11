@@ -24,6 +24,32 @@
     <string name="name_def">Guest</string>
     <string name="name_tip">Tap here to login</string>
 
+    <string name="local_mode">Local mode</string>
+    <string name="sign_in_to_sync">Sign in to sync with cloud</string>
+    <string name="sign_in">Sign in</string>
+    <string name="continue_locally">Continue locally</string>
+    <string name="book_added_locally_unauthorized">Book added locally (unauthorized mode)</string>
+    <string name="new_book">New book</string>
+    <string name="create">Create</string>
+    <string name="enter_title_or_description">Enter title or description</string>
+    <string name="at_least_one_field">Fill at least one field</string>
+    <string name="edit_book">Edit book</string>
+    <string name="sync_started">Sync started...</string>
+    <string name="sign_in_required">Sign in required</string>
+    <string name="book_added_locally">Book added locally</string>
+    <string name="book_added_synced">Book added and synced</string>
+    <string name="signed_out">You signed out</string>
+    <string name="created">Created:</string>
+    <string name="updated">Updated:</string>
+    <string name="synced">Synced:</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="sync_error">Sync error:</string>
+    <string name="synced_books">Synced: %d books</string>
+    <string name="require_login">Login required</string>
+    <string name="login_for_cloud_sync">Sign in with Google to sync books to cloud.</string>
+    <string name="later">Later</string>
+
     <!-- Add Book -->
     <string name="add_book">Add Book</string>
     <string name="save_to_cloud">Save to cloud</string>
