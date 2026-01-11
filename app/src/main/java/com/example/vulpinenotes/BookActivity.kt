@@ -351,7 +351,7 @@ class BookActivity : AppCompatActivity() {
 
                         val updated = entity.copy(
                             title = newTitle,
-                            description = newDescription,  // ← description
+                            description = newDescription,
                             updatedAt = System.currentTimeMillis()
                         )
                         database.chapterDao().insertChapter(updated)

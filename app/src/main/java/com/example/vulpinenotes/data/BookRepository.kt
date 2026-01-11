@@ -90,4 +90,24 @@ class BookRepository(
             db.collection("users").document(uid).collection("books").document(bookId).delete()
         }
     }
+
+    suspend fun getBooksByIds(ids: List<String>): List<Book> {
+        return ids.mapNotNull { id ->
+            bookDao.getBookById(id)?.toBook(storageDir)
+        }
+    }
+
+    suspend fun getAllBooksList(): List<Book> {
+        return try {
+            // Получаем уникальный список книг, используя distinct()
+            val books = bookDao.getAllBooksSync()
+                .distinctBy { it.id } // Убираем дубли по ID
+                .map { it.toBook(storageDir) }
+            Log.d("BookRepository", "Loaded ${books.size} unique books")
+            books
+        } catch (e: Exception) {
+            Log.e("BookRepository", "Error loading books", e)
+            emptyList()
+        }
+    }
 }
