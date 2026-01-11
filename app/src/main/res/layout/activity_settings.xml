@@ -23,128 +23,210 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="16dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <TextView
-            android:id="@+id/theme_text"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/theme_text"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:paddingBottom="12dp"
-            android:textColor="?attr/colorOnBackground" />
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="24dp">
 
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/theme_toggle_group"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:singleSelection="true"
-            app:selectionRequired="true">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_light"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/light_button"
-                app:icon="@drawable/ic_light_mode"
-                app:iconGravity="textStart"
-                app:iconPadding="4dp"
-                app:iconTint="?attr/colorPrimary"
-                app:strokeColor="?attr/colorPrimary" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_system"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/system_button"
-                app:icon="@drawable/ic_auto_mode"
-                app:iconGravity="textStart"
-                app:iconPadding="2dp"
-                app:iconTint="?attr/colorPrimary"
-                app:strokeColor="?attr/colorPrimary" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_dark"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/dark_button"
-                app:icon="@drawable/ic_dark_mode"
-                app:iconGravity="textStart"
-                app:iconPadding="4dp"
-                app:iconTint="?attr/colorPrimary"
-                app:strokeColor="?attr/colorPrimary" />
-
-        </com.google.android.material.button.MaterialButtonToggleGroup>
-
-        <TextView
-            android:id="@+id/language_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/language_select"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:paddingBottom="12dp"
-            android:textColor="?attr/colorOnBackground" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/language_spinner_layout"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/select_language"
-            app:startIconDrawable="@drawable/ic_language"
-            app:startIconTint="?attr/colorPrimary"
-            app:boxCornerRadiusTopStart="24dp"
-            app:boxCornerRadiusTopEnd="24dp"
-            app:boxCornerRadiusBottomStart="24dp"
-            app:boxCornerRadiusBottomEnd="24dp"
-            app:strokeColor="?attr/colorPrimary"
-            app:boxBackgroundMode="outline">
-
-            <AutoCompleteTextView
-                android:id="@+id/language_spinner"
+            <TextView
+                android:id="@+id/theme_text"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="none"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:completionThreshold="0"
-                android:saveEnabled="false" />
+                android:text="@string/theme_text"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingBottom="12dp"
+                android:textColor="?attr/colorOnBackground" />
 
-        </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/theme_toggle_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:singleSelection="true"
+                app:selectionRequired="true">
 
-        <TextView
-            android:id="@+id/other_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/other_text"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:paddingBottom="12dp"
-            android:textColor="?attr/colorOnBackground" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_light"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/light_button"
+                    app:icon="@drawable/ic_light_mode"
+                    app:iconGravity="textStart"
+                    app:iconPadding="4dp"
+                    app:iconTint="?attr/colorPrimary"
+                    app:strokeColor="?attr/colorPrimary" />
 
-        <com.google.android.material.switchmaterial.SwitchMaterial
-            android:id="@+id/switch_auto_sync"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/autosync"
-            android:checked="true"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_system"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/system_button"
+                    app:icon="@drawable/ic_auto_mode"
+                    app:iconGravity="textStart"
+                    app:iconPadding="2dp"
+                    app:iconTint="?attr/colorPrimary"
+                    app:strokeColor="?attr/colorPrimary" />
 
-    </LinearLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_dark"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/dark_button"
+                    app:icon="@drawable/ic_dark_mode"
+                    app:iconGravity="textStart"
+                    app:iconPadding="4dp"
+                    app:iconTint="?attr/colorPrimary"
+                    app:strokeColor="?attr/colorPrimary" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <TextView
+                android:id="@+id/language_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/language_select"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingBottom="12dp"
+                android:textColor="?attr/colorOnBackground" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/language_spinner_layout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/select_language"
+                app:startIconDrawable="@drawable/ic_language"
+                app:startIconTint="?attr/colorPrimary"
+                app:boxCornerRadiusTopStart="24dp"
+                app:boxCornerRadiusTopEnd="24dp"
+                app:boxCornerRadiusBottomStart="24dp"
+                app:boxCornerRadiusBottomEnd="24dp"
+                app:strokeColor="?attr/colorPrimary"
+                app:boxBackgroundMode="outline">
+
+                <AutoCompleteTextView
+                    android:id="@+id/language_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:completionThreshold="0"
+                    android:saveEnabled="false" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <TextView
+                android:id="@+id/other_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/other_text"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingBottom="12dp"
+                android:textColor="?attr/colorOnBackground" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_auto_sync"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/autosync"
+                android:checked="true"
+                app:switchPadding="16dp"/>
+
+            <!-- Раздел уведомлений -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="16dp"
+                android:background="?attr/colorOutline"/>
+
+            <TextView
+                android:id="@+id/notifications_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Уведомления"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnBackground"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical">
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_notifications"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Включить напоминания"
+                    android:checked="false"
+                    app:switchPadding="16dp"/>
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_interval_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Интервал напоминаний:"
+                android:textColor="?attr/colorOnBackground"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_select_interval"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Каждый день"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <TextView
+                android:id="@+id/tv_books_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Книги для напоминаний:"
+                android:textColor="?attr/colorOnBackground"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_select_books"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Выбрать книги"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <TextView
+                android:id="@+id/tv_selected_books"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Не выбрано"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:maxLines="3"
+                android:ellipsize="end"/>
+        </LinearLayout>
+    </ScrollView>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

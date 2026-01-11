@@ -100,7 +100,7 @@
     <string name="by_edit_date">Дата изменения</string>
 
     <string name="contact_tip">Свяжитесь с нами:</string>
-    <string name="version">Версия приложения: 0.1.1</string>
+    <string name="version">Версия: %s</string>
     <string name="title_help">Помощь</string>
 
 </resources>

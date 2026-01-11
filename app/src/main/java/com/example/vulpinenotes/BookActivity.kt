@@ -65,7 +65,7 @@ class BookActivity : AppCompatActivity() {
                             .getChaptersForBookSync(book.id)
                             .firstOrNull { it.chapterId == updated.chapterId } ?: return@launch
 
-                        uploadChapterToCloud(entity) // ✅ синхронизация
+                        uploadChapterToCloud(entity)
                     }
                 }
             }
@@ -351,7 +351,7 @@ class BookActivity : AppCompatActivity() {
 
                         val updated = entity.copy(
                             title = newTitle,
-                            description = newDescription,  // ← description
+                            description = newDescription,
                             updatedAt = System.currentTimeMillis()
                         )
                         database.chapterDao().insertChapter(updated)

@@ -20,7 +20,7 @@ interface BookDao {
     suspend fun updateBook(book: BookEntity)
     @Query("DELETE FROM books WHERE id = :bookId")
     suspend fun deleteById(bookId: String)
-    @Query("SELECT * FROM books")
+    @Query("SELECT DISTINCT * FROM books")
     fun getAllBooksSync(): List<BookEntity>
     @Query("UPDATE books SET cloudSynced = :state WHERE id = :id")
     suspend fun updateCloudState(id: String, state: Boolean)
@@ -31,7 +31,7 @@ interface BookDao {
     @Query("SELECT COUNT(*) FROM chapters WHERE bookId = :bookId")
     suspend fun getRealChapterCount(bookId: String): Int
 
-    // Метод для обновления счётчика (вызывать после добавления/удаления главы)
+    // Метод для обновления счётчика
     @Query("UPDATE books SET chaptersCount = :count, updatedAt = :now WHERE id = :bookId")
     suspend fun updateChaptersCount(bookId: String, count: Int, now: Long = System.currentTimeMillis())
 

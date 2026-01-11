@@ -101,7 +101,7 @@
 
     <!-- Помощь -->
     <string name="contact_tip">Contact with us:</string>
-    <string name="version">App version: 0.1.1</string>
+    <string name="version">Version: %s</string>
     <string name="title_help">Help</string>
 
 </resources>

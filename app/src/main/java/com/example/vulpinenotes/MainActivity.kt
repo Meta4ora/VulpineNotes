@@ -23,7 +23,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.vulpinenotes.data.AppDatabase
 import com.example.vulpinenotes.data.BookEntity
+import com.example.vulpinenotes.data.BookRepository
 import com.example.vulpinenotes.data.ChapterEntity
+import com.example.vulpinenotes.data.NotificationManager
+import com.example.vulpinenotes.data.NotificationSettings
+import com.example.vulpinenotes.data.ReminderInterval
 import com.example.vulpinenotes.data.SortType
 import com.example.vulpinenotes.data.toBook
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -74,6 +78,8 @@ class MainActivity : BaseActivity() {
     private var selectedImageFile: File? = null
     private lateinit var pickImageLauncher: ActivityResultLauncher<String>
 
+    private var authStateListener: FirebaseAuth.AuthStateListener? = null
+
     // Firebase
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
@@ -94,6 +100,9 @@ class MainActivity : BaseActivity() {
         private const val REQUEST_SETTINGS = 1001
         private const val REQUEST_ACCOUNT = 1002
         const val EXTRA_BOOK = "com.example.vulpinenotes.EXTRA_BOOK"
+
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+        private const val ALARM_PERMISSION_REQUEST_CODE = 1002
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -134,7 +143,15 @@ class MainActivity : BaseActivity() {
                 syncAllFromCloud(auth.currentUser!!)
             }
         }
+        authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            val currentUser = firebaseAuth.currentUser
+            updateNavHeader()           // ← всегда обновляем шапку
+        }
+        auth.addAuthStateListener(authStateListener!!)
+
+        restoreNotifications()
     }
+
 
     private fun initViews() {
         drawerLayout = findViewById(R.id.drawer_layout)
@@ -230,6 +247,46 @@ class MainActivity : BaseActivity() {
         }
         sortBooks()
         bookAdapter.notifyDataSetChanged()
+    }
+
+    private fun restoreNotifications() {
+        val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val json = prefs.getString("notification_settings", null) ?: return
+
+        try {
+            val obj = org.json.JSONObject(json)
+            val settings = NotificationSettings(
+                isEnabled = obj.getBoolean("isEnabled"),
+                interval = ReminderInterval.valueOf(obj.optString("interval", "EVERY_DAY")),
+                selectedBookIds = jsonArrayToList(obj.getJSONArray("selectedBookIds"))
+            )
+
+            if (settings.isEnabled && settings.selectedBookIds.isNotEmpty()) {
+                val database = AppDatabase.getDatabase(this)
+                val firestore = FirebaseFirestore.getInstance()
+                val storageDir = filesDir.resolve("covers").apply { mkdirs() }
+
+                val repository = BookRepository(
+                    database.bookDao(),
+                    database.chapterDao(),
+                    firestore,
+                    storageDir
+                )
+
+                val notificationManager = NotificationManager(this, repository)
+                notificationManager.schedule(settings)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun jsonArrayToList(jsonArray: org.json.JSONArray): List<String> {
+        val list = mutableListOf<String>()
+        for (i in 0 until jsonArray.length()) {
+            list.add(jsonArray.getString(i))
+        }
+        return list
     }
 
     private fun showAddBookButton() {
@@ -1165,31 +1222,44 @@ class MainActivity : BaseActivity() {
         return sb.toString()
     }
 
-    // Обработка результата экспорта
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK) {
-            val uri = data?.data ?: return
-            val book = selectedBookForExport ?: return
-            val format = selectedExportFormat ?: return
+            data?.data?.let { uri ->
+                lifecycleScope.launch {
+                    try {
+                        val book = selectedBookForExport ?: return@launch
+                        val format = selectedExportFormat ?: return@launch
 
-            lifecycleScope.launch {
-                try {
-                    val content = generateExportContent(book, format)
-                    contentResolver.openOutputStream(uri)?.use { it.write(content) }
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "Экспорт завершён", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "Ошибка экспорта: ${e.message}", Toast.LENGTH_LONG).show()
+                        val content = generateExportContent(book, format)
+
+                        contentResolver.openOutputStream(uri, "w")?.use { output ->
+                            output.write(content)
+                            output.flush()
+                        }
+
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Книга экспортирована в ${book.title}.${format}",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                    } catch (e: Exception) {
+                        Log.e("EXPORT", "Ошибка записи файла", e)
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Не удалось сохранить файл: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } finally {
+                        selectedBookForExport = null
+                        selectedExportFormat = null
                     }
                 }
+            } ?: run {
+                Toast.makeText(this, "Не выбрано место сохранения", Toast.LENGTH_SHORT).show()
             }
-
-            selectedBookForExport = null
-            selectedExportFormat = null
         }
     }
 
