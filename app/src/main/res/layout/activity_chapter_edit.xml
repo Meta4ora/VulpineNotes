@@ -74,7 +74,6 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginBottom="80dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         android:paddingTop="8dp">
 
@@ -91,7 +90,11 @@
         android:background="@android:color/transparent"
         android:hint="Начните писать..."
         android:textColor="?attr/colorOnSurface"
-        android:textColorHint="?attr/colorOutline"/>
+        android:textColorHint="?attr/colorOutline"
+        android:scrollbars="vertical"
+        android:isScrollContainer="true"
+        android:overScrollMode="always"
+        android:fadeScrollbars="false"/>
 
     <TextView
         android:id="@+id/previewTextView"

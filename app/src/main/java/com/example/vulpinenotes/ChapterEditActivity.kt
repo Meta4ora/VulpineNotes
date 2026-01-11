@@ -4,7 +4,10 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.text.Editable
+import android.util.TypedValue
 import android.view.View
+import android.view.WindowInsets
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -22,6 +25,9 @@ import io.noties.markwon.ext.tables.TablePlugin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+
 
 class ChapterEditActivity : AppCompatActivity() {
 
@@ -80,9 +86,6 @@ class ChapterEditActivity : AppCompatActivity() {
             .usePlugin(HtmlPlugin.create())
             .usePlugin(TablePlugin.create(this))
             .build()
-
-        initMarkwon()
-
 
         // Получение данных
         chapter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -150,11 +153,12 @@ class ChapterEditActivity : AppCompatActivity() {
                 }
             }
 
-            override fun afterTextChanged(s: android.text.Editable?) {
+            override fun afterTextChanged(s: Editable?) {
                 if (isTextChangedByUser && !isInternalChange) {
                     saveStateToUndoStack()
                 }
                 refreshPreview()
+                scrollToCursor()
             }
         })
 
@@ -170,20 +174,69 @@ class ChapterEditActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this) { saveAndExit() }
 
-        // Insets
-        binding.main.setOnApplyWindowInsetsListener { _, insets ->
-            val ime = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
-            val status = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top
+        setupWindowInsets()
+    }
 
-            binding.formattingBar.translationY = -ime.toFloat()
-            binding.appbar.setPadding(
-                binding.appbar.paddingLeft,
-                status,
-                binding.appbar.paddingRight,
-                binding.appbar.paddingBottom
+    @Suppress("DEPRECATION")
+    private fun setupWindowInsets() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+
+            // AppBar под статусбар
+            binding.appbar.setPadding(0, systemBars.top, 0, 0)
+
+            // Смещаем панель форматирования вверх на высоту клавиатуры
+            if (ime.bottom > 0) {
+                // Клавиатура открыта - перемещаем панель форматирования поверх нее
+                binding.formattingBar.translationY = -ime.bottom.toFloat()
+                binding.formattingBar.visibility = View.VISIBLE
+            } else {
+                // Клавиатура скрыта - возвращаем панель форматирования вниз
+                binding.formattingBar.translationY = 0f
+            }
+
+            // Устанавливаем отступы для EditText
+            val paddingHorizontal = dpToPx(24)
+            val paddingTop = dpToPx(16)
+            val formattingBarHeight = binding.formattingBar.height
+
+            // Дополнительный отступ снизу = высота клавиатуры + высота панели форматирования
+            val extraBottomSpace = if (ime.bottom > 0) {
+                ime.bottom + formattingBarHeight + dpToPx(16)
+            } else {
+                formattingBarHeight + dpToPx(32)
+            }
+
+            binding.contentEditText.setPadding(
+                paddingHorizontal,
+                paddingTop,
+                paddingHorizontal,
+                extraBottomSpace
             )
+
             insets
         }
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
+    }
+
+    private fun dpToPx(dp: Float): Float {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp,
+            resources.displayMetrics
+        )
     }
 
     private fun saveStateToUndoStack() {
@@ -198,6 +251,52 @@ class ChapterEditActivity : AppCompatActivity() {
 
             previousText = currentText
             previousCursor = currentCursor
+        }
+    }
+
+    private fun getKeyboardHeight(): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val windowInsets = window.decorView.rootWindowInsets
+            windowInsets?.getInsets(android.view.WindowInsets.Type.ime())?.bottom ?: 0
+        } else {
+            // Для старых версий используем другой способ определения высоты клавиатуры
+            val rect = android.graphics.Rect()
+            window.decorView.getWindowVisibleDisplayFrame(rect)
+            val screenHeight = window.decorView.rootView.height
+            val keyboardHeight = screenHeight - rect.bottom
+
+            // Фильтруем ложные срабатывания (маленькие изменения)
+            if (keyboardHeight > screenHeight * 0.15) {
+                keyboardHeight
+            } else {
+                0
+            }
+        }
+    }
+
+    private fun scrollToCursor() {
+        binding.contentEditText.post {
+            val editText = binding.contentEditText
+            val layout = editText.layout ?: return@post
+
+            val cursor = editText.selectionStart.coerceIn(0, editText.text?.length ?: 0)
+            val line = layout.getLineForOffset(cursor)
+
+            // Позиция курсора относительно начала EditText
+            val cursorY = layout.getLineBottom(line)
+
+            // Видимая область (высота EditText минус панель форматирования)
+            val visibleBottom = editText.height - dpToPx(100) // примерный отступ
+
+            // Если курсор ниже видимой области — скроллим
+            if (cursorY > visibleBottom) {
+                val scrollAmount = cursorY - visibleBottom + dpToPx(50)
+                editText.scrollTo(0, scrollAmount.coerceAtLeast(0))
+            }
+            // Если сильно выше — можно подтянуть вверх (опционально)
+            else if (cursorY < editText.scrollY + dpToPx(40)) {
+                editText.scrollTo(0, (cursorY - dpToPx(40)).coerceAtLeast(0))
+            }
         }
     }
 
@@ -378,15 +477,6 @@ class ChapterEditActivity : AppCompatActivity() {
         saveStateToUndoStack()
     }
 
-    // ===================== ФУНКЦИЯ ДЛЯ ТАБЛИЦ =====================
-
-    private fun initMarkwon() {
-        markwon = Markwon.builder(this)
-            .usePlugin(HtmlPlugin.create())
-            .usePlugin(TablePlugin.create(this))
-            .build()
-    }
-
     private fun showTableDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_table, null)
         val etRows = dialogView.findViewById<EditText>(R.id.etRows)
@@ -463,7 +553,6 @@ class ChapterEditActivity : AppCompatActivity() {
         refreshPreview()
     }
 
-
     // ===================== ФУНКЦИЯ ДЛЯ РАЗДЕЛИТЕЛЯ =====================
     private fun insertDivider() {
         isTextChangedByUser = false
@@ -491,7 +580,6 @@ class ChapterEditActivity : AppCompatActivity() {
         refreshPreview()
     }
 
-    // ===================== УЛУЧШЕННАЯ ФУНКЦИЯ ДЛЯ ОЧИСТКИ ФОРМАТИРОВАНИЯ =====================
     private fun clearFormatting() {
         val edit = binding.contentEditText
         val text = edit.text ?: return
@@ -603,7 +691,6 @@ class ChapterEditActivity : AppCompatActivity() {
             )
         }
     }
-
 
     private fun saveAndExit() {
         val content = binding.contentEditText.text.toString().trim()
