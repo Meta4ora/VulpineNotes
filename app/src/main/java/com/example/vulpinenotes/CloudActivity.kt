@@ -107,14 +107,14 @@ class CloudActivity : AppCompatActivity() {
         }
         activityScope.launch {
             try {
-                // 1. получаем список ID книг из облака
+                // получаем список ID книг из облака
                 val cloudSnapshot = db.collection("users")
                     .document(auth.currentUser!!.uid)
                     .collection("books")
                     .get()
                     .await()
                 val cloudBookIds = cloudSnapshot.documents.map { it.id }.toSet()
-                // 2. получаем все локальные книги
+                // получаем все локальные книги
                 val localBookEntities = withContext(Dispatchers.IO) {
                     roomDb.bookDao().getAllBooksSync()
                 }

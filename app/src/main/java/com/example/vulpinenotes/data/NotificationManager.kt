@@ -116,7 +116,7 @@ class NotificationManager(
 
     fun show(bookIds: List<String>) {
         CoroutineScope(Dispatchers.IO).launch {
-            // Проверяем разрешение на уведомления для Android 13+
+            // проверяем разрешение на уведомления для Android 13+
             if (!hasNotificationPermission()) {
                 Log.e("NotificationManager", "Нет разрешения на отправку уведомлений")
                 return@launch
@@ -170,11 +170,11 @@ class NotificationManager(
                 false
             }
         } else {
-            true // Для версий ниже Android 12 разрешение не требуется
+            true // для версий ниже Android 12 разрешение не требуется
         }
     }
 
-    // Проверка разрешения на уведомления (Android 13+)
+    // проверка разрешения на уведомления (Android 13+)
     private fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ActivityCompat.checkSelfPermission(
@@ -182,7 +182,7 @@ class NotificationManager(
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else {
-            true // Для версий ниже Android 13 разрешение не требуется
+            true // для версий ниже Android 13 разрешение не требуется
         }
     }
 }

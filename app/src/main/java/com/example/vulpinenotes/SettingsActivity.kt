@@ -50,7 +50,7 @@ class SettingsActivity : BaseActivity() {
         applySavedTheme()
         setContentView(R.layout.activity_settings)
 
-        // Инициализируем зависимости
+        // инициализируем зависимости
         val database = AppDatabase.getDatabase(this)
         val firestore = FirebaseFirestore.getInstance()
         val storageDir = File(filesDir, "covers").apply { mkdirs() }
@@ -72,7 +72,7 @@ class SettingsActivity : BaseActivity() {
         setupNotificationsSection()
         setupBackPressHandler()
 
-        // Загружаем все книги в фоновом потоке
+        // загружаем все книги в фоновом потоке
         loadAllBooks()
     }
 
@@ -88,7 +88,7 @@ class SettingsActivity : BaseActivity() {
 
         notificationsSwitch.isChecked = settings.isEnabled
 
-        // Обновляем текст интервала
+        // обновляем текст интервала
         updateIntervalText(settings.interval)
 
         notificationsSwitch.setOnCheckedChangeListener { _, enabled ->
@@ -118,7 +118,7 @@ class SettingsActivity : BaseActivity() {
     }
 
     private fun loadAllBooks(onLoaded: (() -> Unit)? = null) {
-        if (isLoadingBooks) return // Не загружаем, если уже идет загрузка
+        if (isLoadingBooks) return // не загружаем, если уже идет загрузка
 
         isLoadingBooks = true
 
@@ -126,12 +126,12 @@ class SettingsActivity : BaseActivity() {
             try {
                 val books = bookRepository.getAllBooksList()
 
-                // Возвращаемся в главный поток для обновления UI
+                // возвращаемся в главный поток для обновления UI
                 CoroutineScope(Dispatchers.Main).launch {
                     allBooks.clear() // Очищаем список перед добавлением новых
                     allBooks.addAll(books)
 
-                    // Обновляем текст выбранных книг
+                    // обновляем текст выбранных книг
                     val settings = loadNotificationSettings()
                     updateSelectedBooksText(settings.selectedBookIds)
 

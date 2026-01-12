@@ -83,7 +83,6 @@ class BookRepository(
     suspend fun deleteBook(bookId: String) {
         bookDao.deleteById(bookId)
         chapterDao.deleteChaptersForBook(bookId)
-        // удаление обложки
         File(storageDir, "cover_$bookId.jpg").takeIf { it.exists() }?.delete()
         // удаление из облака
         FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->

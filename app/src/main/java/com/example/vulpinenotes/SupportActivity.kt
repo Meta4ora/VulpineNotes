@@ -32,7 +32,7 @@ class SupportActivity : BaseActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
-                finish() // или onBackPressedDispatcher.onBackPressed()
+                finish()
                 true
             }
             else -> super.onOptionsItemSelected(item)

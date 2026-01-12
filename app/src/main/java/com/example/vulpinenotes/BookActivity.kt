@@ -264,7 +264,6 @@ class BookActivity : AppCompatActivity() {
                             chapterAdapter.notifyItemRangeChanged(idx, chapters.size)
                         }
 
-                        // 8. Уведомление
                         Toast.makeText(this@BookActivity, "Глава «${chapter.title}» удалена", Toast.LENGTH_SHORT).show()
 
                     } catch (e: Exception) {

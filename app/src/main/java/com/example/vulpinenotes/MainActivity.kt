@@ -650,7 +650,7 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
-    // Вспомогательная функция для экранирования HTML
+    // экранирование html, уже не нужно
     private fun escapeHtml(text: String): String {
         return text.replace("&", "&amp;")
             .replace("<", "&lt;")
@@ -659,7 +659,7 @@ class MainActivity : BaseActivity() {
             .replace("'", "&#39;")
     }
 
-    // Вызывается после выбора книги для экспорта
+    // вызывается после выбора книги для экспорта
     private fun showExportDialog(book: Book) {
         val formats = arrayOf("PDF", "Markdown")
         MaterialAlertDialogBuilder(this@MainActivity)
@@ -687,7 +687,7 @@ class MainActivity : BaseActivity() {
             try {
                 val chapters = database.chapterDao().getChaptersForExport(book.id)
 
-                // Проверка на пустую книгу
+                // проверка на пустую книгу
                 if (chapters.isNullOrEmpty()) {
                     // Возвращаем специальный PDF/Markdown с сообщением о пустой книге
                     return@withContext when (format.lowercase()) {
@@ -697,7 +697,7 @@ class MainActivity : BaseActivity() {
                     }
                 }
 
-                // Проверка на главы с пустым содержимым
+                // проверка на главы с пустым содержимым
                 val hasContent = chapters.any { chapter ->
                     chapter.content.isNotBlank() ||
                             chapter.title.isNotBlank()
@@ -768,7 +768,7 @@ class MainActivity : BaseActivity() {
             }
         }
 
-    // Функции для создания контента при пустой книге
+    // функции для создания контента при пустой книге
     private fun createEmptyBookMarkdown(book: Book): ByteArray {
         val content = """
         # ${book.title}
@@ -894,7 +894,6 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    // ДОБАВЬ эту функцию для добавления footer на все страницы
     private fun addFooterToAllPages(pdfDoc: PdfDocument, bookTitle: String) {
         try {
             val totalPages = pdfDoc.numberOfPages
@@ -902,7 +901,7 @@ class MainActivity : BaseActivity() {
                 val page = pdfDoc.getPage(i)
                 val pageSize = page.pageSize
 
-                // Создаем новую Document для добавления footer
+                // создаем новую Document для добавления footer
                 Document(pdfDoc, pageSize as PageSize?, false).use { doc ->
                     val footerText = "Страница $i из $totalPages | Сделано в Vulpine Notes"
                     val footer = Paragraph(footerText)
@@ -923,7 +922,6 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    // ДОБАВЬ эту вспомогательную функцию для создания PDF с ошибкой
     private fun createErrorPdf(errorMessage: String): ByteArray {
         return ByteArrayOutputStream().use { outputStream ->
             PdfWriter(outputStream).use { writer ->
@@ -958,8 +956,6 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    // ОБНОВИ функцию markdownToHtml для правильной обработки разрывов страниц
-    // ЗАМЕНИ функцию markdownToHtml полностью:
     private fun markdownToHtml(markdown: String): String {
         val sb = StringBuilder()
         val lines = markdown.lines()
@@ -1118,7 +1114,7 @@ class MainActivity : BaseActivity() {
             val nextLine = if (i + 1 < lines.size) lines[i + 1].trim() else ""
 
             when {
-                // СПЕЦИАЛЬНЫЙ РАЗДЕЛИТЕЛЬ ДЛЯ РАЗРЫВА СТРАНИЦ (# ##)
+                // спец разделитель для разрыва страниц
                 trimmedLine == "# ##" -> {
                     closeActiveBlocks()
                     // Добавляем div с классом для разрыва страницы
