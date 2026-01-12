@@ -14,6 +14,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import de.hdodenhof.circleimageview.CircleImageView
 import com.google.firebase.firestore.FirebaseFirestore
@@ -90,29 +91,43 @@ class AccountActivity : BaseActivity() {
 
     private fun firebaseAuthWithGoogle(idToken: String) {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+        // Показываем индикатор загрузки (очень желательно!)
+        // findViewById<ProgressBar>(R.id.progressBar)?.visibility = View.VISIBLE
+        // btnSignIn.isEnabled = false
+
         auth.signInWithCredential(credential)
-            .addOnSuccessListener { result ->
-                val user = result.user
-                // сохохраняем email и имена пользователя в Firestore (merge)
-                if (user != null) {
-                    val userData = mapOf(
-                        "name" to (user.displayName ?: ""),
-                        "email" to (user.email ?: ""),
-                        "photoUrl" to (user.photoUrl?.toString() ?: "")
-                    )
-                    FirebaseFirestore.getInstance()
-                        .collection("users")
-                        .document(user.uid)
-                        .set(userData, SetOptions.merge())
+            .addOnCompleteListener(this) { task ->   // ← используем addOnCompleteListener
+                // findViewById<ProgressBar>(R.id.progressBar)?.visibility = View.GONE
+                // btnSignIn.isEnabled = true
+
+                if (task.isSuccessful) {
+                    val user = auth.currentUser
+                    if (user != null) {
+                        saveUserToFirestore(user)
+                        updateUI(user)
+                        setResult(RESULT_OK)
+                        finish()
+                    }
+                } else {
+                    Toast.makeText(this, "Ошибка авторизации: ${task.exception?.localizedMessage}", Toast.LENGTH_LONG).show()
+                    updateUI(null)
                 }
-                updateUI(user)
-                // возвращаемся в MainActivity с RESULT_OK, чтобы он обновил данные
-                setResult(RESULT_OK)
-                finish()
             }
-            .addOnFailureListener {
-                Toast.makeText(this, "Ошибка входа", Toast.LENGTH_SHORT).show()
-            }
+    }
+
+    private fun saveUserToFirestore(user: FirebaseUser) {
+        val userData = mapOf(
+            "name"     to (user.displayName ?: ""),
+            "email"    to (user.email ?: ""),
+            "photoUrl" to (user.photoUrl?.toString() ?: "")
+        )
+
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(user.uid)
+            .set(userData, SetOptions.merge())
+        // .addOnFailureListener { ... }
     }
 
     private fun updateUI(user: com.google.firebase.auth.FirebaseUser?) {
