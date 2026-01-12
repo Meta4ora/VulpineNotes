@@ -686,7 +686,31 @@ class MainActivity : BaseActivity() {
         withContext(Dispatchers.IO) {
             try {
                 val chapters = database.chapterDao().getChaptersForExport(book.id)
-                if (chapters.isNullOrEmpty()) throw IllegalStateException("В книге нет глав для экспорта")
+
+                // Проверка на пустую книгу
+                if (chapters.isNullOrEmpty()) {
+                    // Возвращаем специальный PDF/Markdown с сообщением о пустой книге
+                    return@withContext when (format.lowercase()) {
+                        "md", "markdown" -> createEmptyBookMarkdown(book)
+                        "pdf" -> createEmptyBookPdf(book)
+                        else -> byteArrayOf()
+                    }
+                }
+
+                // Проверка на главы с пустым содержимым
+                val hasContent = chapters.any { chapter ->
+                    chapter.content.isNotBlank() ||
+                            chapter.title.isNotBlank()
+                }
+
+                if (!hasContent) {
+                    // Все главы пустые
+                    return@withContext when (format.lowercase()) {
+                        "md", "markdown" -> createEmptyChaptersMarkdown(book)
+                        "pdf" -> createEmptyChaptersPdf(book)
+                        else -> byteArrayOf()
+                    }
+                }
 
                 val sortedChapters = chapters.sortedBy { it.position }
                 val dateFormat = java.text.DateFormat.getDateTimeInstance()
@@ -698,12 +722,17 @@ class MainActivity : BaseActivity() {
                     appendLine("**Создано:** ${dateFormat.format(Date(book.createdAt))}\n")
                     appendLine("---\n")
                     for ((index, chapter) in sortedChapters.withIndex()) {
-                        // Добавляем специальный разделитель между главами
+                        if (chapter.content.isBlank() && chapter.title.isBlank()) continue
+
                         if (index > 0) {
-                            appendLine("# ##") // Специальный маркер для разрыва страницы
+                            appendLine("# ##")
                         }
-                        appendLine("## ${chapter.title}\n")
-                        appendLine(chapter.content)
+
+                        val chapterTitle = chapter.title.ifBlank { "Без названия" }
+                        val chapterContent = chapter.content.ifBlank { "*Пустая глава*" }
+
+                        appendLine("## $chapterTitle\n")
+                        appendLine(chapterContent)
                         appendLine("\n")
                     }
                 }
@@ -712,43 +741,158 @@ class MainActivity : BaseActivity() {
                     "md", "markdown" -> markdownContent.toByteArray(Charsets.UTF_8)
 
                     "pdf" -> {
-                        // Получаем HTML
                         val htmlContent = markdownToHtml(markdownContent)
-
-                        // Конвертируем HTML в PDF с улучшенной обработкой
                         ByteArrayOutputStream().use { outputStream ->
                             PdfWriter(outputStream).use { writer ->
                                 PdfDocument(writer).use { pdfDoc ->
                                     pdfDoc.defaultPageSize = PageSize.A4
-
-                                    // Создаем конвертер с настройками
                                     val converterProperties = com.itextpdf.html2pdf.ConverterProperties().apply {
-                                        setBaseUri("") // Указываем пустой базовый URI
+                                        setBaseUri("")
                                         setCreateAcroForm(false)
                                     }
-
-                                    // Конвертируем HTML в PDF
                                     HtmlConverter.convertToPdf(htmlContent, pdfDoc, converterProperties)
-
-                                    // Добавляем footer на каждую страницу
                                     addFooterToAllPages(pdfDoc, book.title)
                                 }
                             }
                             outputStream.toByteArray()
                         }
                     }
-
                     else -> byteArrayOf()
                 }
             } catch (e: Exception) {
                 Log.e("EXPORT", "Ошибка генерации контента: ${e.message}", e)
-                // Возвращаем PDF с сообщением об ошибке
                 if (format.lowercase() == "pdf") {
                     return@withContext createErrorPdf(e.message ?: "Неизвестная ошибка")
                 }
                 throw e
             }
         }
+
+    // Функции для создания контента при пустой книге
+    private fun createEmptyBookMarkdown(book: Book): ByteArray {
+        val content = """
+        # ${book.title}
+        
+        ## Книга пуста
+        
+        В этой книге пока нет ни одной главы с содержимым.
+        
+        Добавьте главы в книгу, чтобы их можно было экспортировать.
+        
+        ---
+        
+        *Создано в Vulpine Notes*
+    """.trimIndent()
+        return content.toByteArray(Charsets.UTF_8)
+    }
+
+    private fun createEmptyChaptersMarkdown(book: Book): ByteArray {
+        val content = """
+        # ${book.title}
+        
+        ## Главы пустые
+        
+        В этой книге есть главы, но все они не содержат текста.
+        
+        Отредактируйте главы и добавьте в них содержимое, чтобы их можно было экспортировать.
+        
+        ---
+        
+        *Создано в Vulpine Notes*
+    """.trimIndent()
+        return content.toByteArray(Charsets.UTF_8)
+    }
+
+    private fun createEmptyBookPdf(book: Book): ByteArray {
+        return ByteArrayOutputStream().use { outputStream ->
+            PdfWriter(outputStream).use { writer ->
+                PdfDocument(writer).use { pdfDoc ->
+                    Document(pdfDoc).use { document ->
+                        pdfDoc.defaultPageSize = PageSize.A4
+
+                        document.add(
+                            Paragraph(book.title)
+                                .setFontSize(20f)
+                                .setBold()
+                                .setTextAlignment(TextAlignment.CENTER)
+                        )
+
+                        document.add(Paragraph("\n\n"))
+
+                        document.add(
+                            Paragraph("Книга пуста")
+                                .setFontSize(16f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                        )
+
+                        document.add(Paragraph("\n"))
+
+                        document.add(
+                            Paragraph("В этой книге пока нет ни одной главы с содержимым.\n\n" +
+                                    "Добавьте главы в книгу, чтобы их можно было экспортировать.")
+                                .setFontSize(12f)
+                                .setTextAlignment(TextAlignment.LEFT)
+                        )
+
+                        document.add(Paragraph("\n\n---\n\n"))
+
+                        document.add(
+                            Paragraph("Сделано в Vulpine Notes")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                        )
+                    }
+                }
+            }
+            outputStream.toByteArray()
+        }
+    }
+
+    private fun createEmptyChaptersPdf(book: Book): ByteArray {
+        return ByteArrayOutputStream().use { outputStream ->
+            PdfWriter(outputStream).use { writer ->
+                PdfDocument(writer).use { pdfDoc ->
+                    Document(pdfDoc).use { document ->
+                        pdfDoc.defaultPageSize = PageSize.A4
+
+                        document.add(
+                            Paragraph(book.title)
+                                .setFontSize(20f)
+                                .setBold()
+                                .setTextAlignment(TextAlignment.CENTER)
+                        )
+
+                        document.add(Paragraph("\n\n"))
+
+                        document.add(
+                            Paragraph("Главы пустые")
+                                .setFontSize(16f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                        )
+
+                        document.add(Paragraph("\n"))
+
+                        document.add(
+                            Paragraph("В этой книге есть главы, но все они не содержат текста.\n\n" +
+                                    "Отредактируйте главы и добавьте в них содержимое, " +
+                                    "чтобы их можно было экспортировать.")
+                                .setFontSize(12f)
+                                .setTextAlignment(TextAlignment.LEFT)
+                        )
+
+                        document.add(Paragraph("\n\n---\n\n"))
+
+                        document.add(
+                            Paragraph("Сделано в Vulpine Notes")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                        )
+                    }
+                }
+            }
+            outputStream.toByteArray()
+        }
+    }
 
     // ДОБАВЬ эту функцию для добавления footer на все страницы
     private fun addFooterToAllPages(pdfDoc: PdfDocument, bookTitle: String) {
