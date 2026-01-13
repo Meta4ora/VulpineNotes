@@ -23,34 +23,40 @@ import java.io.File
 
 class SettingsActivity : BaseActivity() {
 
+    // Константы для хранения настроек в SharedPreferences
     private val PREFS_NAME = "app_prefs"
     private val KEY_LANGUAGE = "app_language"
     private val KEY_THEME = "app_theme"
     private val KEY_AUTO_SYNC = "auto_sync"
     private val KEY_NOTIFICATION_SETTINGS = "notification_settings"
 
+    // UI элементы для настроек уведомлений
     private lateinit var autoSyncSwitch: SwitchMaterial
     private lateinit var notificationsSwitch: SwitchMaterial
     private lateinit var selectBooksBtn: Button
     private lateinit var selectedBooksText: TextView
     private lateinit var selectIntervalBtn: Button
 
+    // Менеджеры и репозитории
     private lateinit var notificationManager: NotificationManager
     private lateinit var bookRepository: BookRepository
     private val allBooks = mutableListOf<Book>()
-    private var isLoadingBooks = false // Флаг загрузки
+    private var isLoadingBooks = false // Флаг для предотвращения повторной загрузки
 
+    // UI элементы для настроек языка
     private lateinit var languageSpinner: AutoCompleteTextView
     private lateinit var languages: List<Language>
 
+    // Флаг для предотвращения обработки событий при программной установке темы
     private var isApplyingThemeFromState = false
 
+    // Основной метод создания активности. Инициализирует зависимости и настраивает UI
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySavedTheme()
         setContentView(R.layout.activity_settings)
 
-        // инициализируем зависимости
+        // Инициализация зависимостей: базы данных, облачного хранилища и директории обложек
         val database = AppDatabase.getDatabase(this)
         val firestore = FirebaseFirestore.getInstance()
         val storageDir = File(filesDir, "covers").apply { mkdirs() }
@@ -64,6 +70,7 @@ class SettingsActivity : BaseActivity() {
 
         notificationManager = NotificationManager(this, bookRepository)
 
+        // Настройка всех компонентов UI
         bindViews()
         setupToolbar()
         setupThemeSwitcher()
@@ -72,10 +79,11 @@ class SettingsActivity : BaseActivity() {
         setupNotificationsSection()
         setupBackPressHandler()
 
-        // загружаем все книги в фоновом потоке
+        // Фоновая загрузка всех книг для выбора в уведомлениях
         loadAllBooks()
     }
 
+    // Привязка View элементов к переменным
     private fun bindViews() {
         notificationsSwitch = findViewById(R.id.switch_notifications)
         selectBooksBtn = findViewById(R.id.btn_select_books)
@@ -83,14 +91,16 @@ class SettingsActivity : BaseActivity() {
         selectIntervalBtn = findViewById(R.id.btn_select_interval)
     }
 
+    // Настройка секции уведомлений: загрузка настроек, установка слушателей
     private fun setupNotificationsSection() {
         val settings = loadNotificationSettings()
 
         notificationsSwitch.isChecked = settings.isEnabled
 
-        // обновляем текст интервала
+        // Обновление текста кнопки интервала в соответствии с сохраненными настройками
         updateIntervalText(settings.interval)
 
+        // Обработка включения/выключения уведомлений
         notificationsSwitch.setOnCheckedChangeListener { _, enabled ->
             val updated = settings.copy(isEnabled = enabled)
             saveNotificationSettings(updated)
@@ -102,6 +112,7 @@ class SettingsActivity : BaseActivity() {
             }
         }
 
+        // Обработка выбора книг для уведомлений
         selectBooksBtn.setOnClickListener {
             if (allBooks.isEmpty() && !isLoadingBooks) {
                 loadAllBooks {
@@ -112,13 +123,15 @@ class SettingsActivity : BaseActivity() {
             }
         }
 
+        // Обработка выбора интервала уведомлений
         selectIntervalBtn.setOnClickListener {
             showIntervalSelectionDialog()
         }
     }
 
+    // Загрузка всех книг из репозитория в фоновом режиме
     private fun loadAllBooks(onLoaded: (() -> Unit)? = null) {
-        if (isLoadingBooks) return // не загружаем, если уже идет загрузка
+        if (isLoadingBooks) return // предотвращение повторной загрузки
 
         isLoadingBooks = true
 
@@ -126,12 +139,12 @@ class SettingsActivity : BaseActivity() {
             try {
                 val books = bookRepository.getAllBooksList()
 
-                // возвращаемся в главный поток для обновления UI
+                // Возврат в главный поток для обновления UI
                 CoroutineScope(Dispatchers.Main).launch {
-                    allBooks.clear() // Очищаем список перед добавлением новых
+                    allBooks.clear() // Очистка перед добавлением новых
                     allBooks.addAll(books)
 
-                    // обновляем текст выбранных книг
+                    // Обновление текста выбранных книг после загрузки
                     val settings = loadNotificationSettings()
                     updateSelectedBooksText(settings.selectedBookIds)
 
@@ -147,6 +160,7 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    // Показ диалога выбора интервала уведомлений
     private fun showIntervalSelectionDialog() {
         val intervals = com.example.vulpinenotes.data.ReminderInterval.values()
         val intervalNames = intervals.map { it.title }.toTypedArray()
@@ -162,6 +176,7 @@ class SettingsActivity : BaseActivity() {
                 saveNotificationSettings(updated)
                 updateIntervalText(selectedInterval)
 
+                // Перепланирование уведомлений при изменении интервала
                 if (updated.isEnabled && updated.selectedBookIds.isNotEmpty()) {
                     notificationManager.schedule(updated)
                 }
@@ -171,14 +186,17 @@ class SettingsActivity : BaseActivity() {
             .show()
     }
 
+    // Обновление текста кнопки интервала
     private fun updateIntervalText(interval: com.example.vulpinenotes.data.ReminderInterval) {
         selectIntervalBtn.text = interval.title
     }
 
+    // Показ диалога выбора книг для уведомлений
     private fun showBooksSelectionDialog() {
         val settings = loadNotificationSettings()
         val selectedIds = settings.selectedBookIds.toMutableSet()
 
+        // Проверка наличия книг для выбора
         if (allBooks.isEmpty()) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Нет книг")
@@ -217,12 +235,14 @@ class SettingsActivity : BaseActivity() {
             .show()
     }
 
+    // Обновление списка выбранных книг и перепланирование уведомлений
     private fun updateSelectedBooks(selectedIds: List<String>) {
         val currentSettings = loadNotificationSettings()
         val updatedSettings = currentSettings.copy(selectedBookIds = selectedIds)
         saveNotificationSettings(updatedSettings)
         updateSelectedBooksText(selectedIds)
 
+        // Перепланирование или отмена уведомлений в зависимости от выбора
         if (updatedSettings.isEnabled && updatedSettings.selectedBookIds.isNotEmpty()) {
             notificationManager.schedule(updatedSettings)
         } else if (updatedSettings.selectedBookIds.isEmpty()) {
@@ -230,6 +250,7 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    // Обновление текста с информацией о выбранных книгах
     private fun updateSelectedBooksText(selectedIds: List<String>) {
         val selectedBooks = allBooks.filter { selectedIds.contains(it.id) }
 
@@ -246,6 +267,7 @@ class SettingsActivity : BaseActivity() {
         selectedBooksText.text = text
     }
 
+    // Загрузка настроек уведомлений из SharedPreferences
     private fun loadNotificationSettings(): NotificationSettings {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val json = prefs.getString(KEY_NOTIFICATION_SETTINGS, null) ?: return NotificationSettings()
@@ -264,6 +286,7 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    // Сохранение настроек уведомлений в SharedPreferences
     private fun saveNotificationSettings(settings: NotificationSettings) {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val json = org.json.JSONObject().apply {
@@ -274,6 +297,7 @@ class SettingsActivity : BaseActivity() {
         prefs.edit().putString(KEY_NOTIFICATION_SETTINGS, json.toString()).apply()
     }
 
+    // Преобразование JSONArray в List<String> для работы с массивами в JSON
     private fun jsonArrayToList(jsonArray: org.json.JSONArray): List<String> {
         val list = mutableListOf<String>()
         for (i in 0 until jsonArray.length()) {
@@ -282,6 +306,7 @@ class SettingsActivity : BaseActivity() {
         return list
     }
 
+    // Настройка обработчика кнопки "Назад" с учетом изменений языка
     private fun setupBackPressHandler() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -294,6 +319,7 @@ class SettingsActivity : BaseActivity() {
         })
     }
 
+    // Настройка переключателя темы (светлая/темная/системная)
     private fun setupThemeSwitcher() {
         val themeToggleGroup = findViewById<MaterialButtonToggleGroup>(R.id.theme_toggle_group)
         themeToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -305,6 +331,7 @@ class SettingsActivity : BaseActivity() {
                 else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
 
+            // Предотвращение повторного применения той же темы
             if (AppCompatDelegate.getDefaultNightMode() == mode && getSavedTheme() == mode) return@addOnButtonCheckedListener
 
             saveTheme(mode)
@@ -312,6 +339,7 @@ class SettingsActivity : BaseActivity() {
             setResult(RESULT_OK)
         }
 
+        // Установка сохраненной темы при запуске
         val savedMode = getSavedTheme()
         val checkedId = when (savedMode) {
             AppCompatDelegate.MODE_NIGHT_NO -> R.id.btn_light
@@ -324,6 +352,7 @@ class SettingsActivity : BaseActivity() {
         isApplyingThemeFromState = false
     }
 
+    // Настройка выпадающего списка выбора языка
     private fun setupLanguageSpinner() {
         languageSpinner = findViewById(R.id.language_spinner)
         languages = listOf(
@@ -334,10 +363,12 @@ class SettingsActivity : BaseActivity() {
         val adapter = LanguageAdapter(this, R.layout.item_language, languages)
         languageSpinner.setAdapter(adapter)
 
+        // Установка сохраненного языка
         val savedLang = getSavedLanguage()
         val current = languages.find { it.code == savedLang } ?: languages[0]
         languageSpinner.setText(current.name, false)
 
+        // Обработка выбора языка
         languageSpinner.setOnItemClickListener { _, _, position, _ ->
             val selected = languages[position]
             if (getSavedLanguage() != selected.code) {
@@ -347,11 +378,12 @@ class SettingsActivity : BaseActivity() {
                     .putBoolean("lang_changed", true)
                     .apply()
                 setResult(RESULT_OK)
-                recreate()
+                recreate() // Пересоздание активности для применения языка
             }
         }
     }
 
+    // Сохранение выбранного языка в SharedPreferences
     private fun saveLanguage(code: String) {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -359,6 +391,7 @@ class SettingsActivity : BaseActivity() {
             .apply()
     }
 
+    // Настройка переключателя автоматической синхронизации с облаком
     private fun setupAutoSyncSwitch() {
         autoSyncSwitch = findViewById(R.id.switch_auto_sync)
         val isAutoSync = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -373,11 +406,13 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    // Получение сохраненного языка из SharedPreferences
     private fun getSavedLanguage(): String {
         return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LANGUAGE, "ru") ?: "ru"
     }
 
+    // Сохранение выбранной темы в SharedPreferences
     private fun saveTheme(mode: Int) {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -385,11 +420,13 @@ class SettingsActivity : BaseActivity() {
             .apply()
     }
 
+    // Получение сохраненной темы из SharedPreferences
     private fun getSavedTheme(): Int {
         return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
     }
 
+    // Применение сохраненной темы при создании активности
     private fun applySavedTheme() {
         val mode = getSavedTheme()
         if (AppCompatDelegate.getDefaultNightMode() != mode) {
@@ -397,6 +434,7 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    // Настройка Toolbar с кнопкой "Назад"
     private fun setupToolbar() {
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)

@@ -47,8 +47,11 @@ class BookActivity : AppCompatActivity() {
     private lateinit var firestore: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
 
+    // Отдельная область видимости корутин для фоновых операций (синхронизация с облаком)
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // Регистрация лаунчера для получения результата редактирования главы
+    // Обновляет UI и синхронизирует с облаком при необходимости
     val editChapterLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -59,6 +62,7 @@ class BookActivity : AppCompatActivity() {
                 chapters[pos] = updated
                 chapterAdapter.notifyItemChanged(pos)
 
+                // Если книга синхронизирована с облаком, отправляем изменения
                 if (book.cloudSynced) {
                     lifecycleScope.launch {
                         val entity = database.chapterDao()
@@ -72,7 +76,8 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
-
+    // Основной метод создания активности. Инициализирует UI, получает данные книги,
+    // настраивает RecyclerView и загружает главы из базы данных
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -97,11 +102,14 @@ class BookActivity : AppCompatActivity() {
         setupFab()
         loadChaptersFromRoom()
 
+        // Обработчик кнопки "Назад" (физической или из UI)
         onBackPressedDispatcher.addCallback(this) {
             finish()
         }
     }
 
+    // Создание меню в Toolbar. Показывает пункт синхронизации только для книг,
+    // которые уже синхронизированы с облаком
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_menu, menu)
         val syncItem = menu.findItem(R.id.action_sync)
@@ -109,6 +117,7 @@ class BookActivity : AppCompatActivity() {
         return true
     }
 
+    // Обработка выбора пунктов меню. Обрабатывает кнопку синхронизации и кнопку "Назад"
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_sync -> {
@@ -123,6 +132,8 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
+    // Ручная синхронизация всех глав книги с облаком
+    // Запускается при нажатии на пункт меню "Синхронизировать"
     private fun manualSyncAllChapters() {
         if (!book.cloudSynced) return
 
@@ -135,6 +146,8 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
+    // Настройка RecyclerView для отображения списка глав
+    // Инициализирует адаптер, LayoutManager и настраивает drag-and-drop
     private fun setupRecyclerView() {
         recyclerView = findViewById(R.id.chapters_recycler_view)
         chapterAdapter = ChapterAdapter(
@@ -151,6 +164,7 @@ class BookActivity : AppCompatActivity() {
         setupDragAndDrop()
     }
 
+    // Настройка FAB (кнопки добавления главы) с анимацией нажатия
     private fun setupFab() {
         findViewById<ImageButton>(R.id.fab_add_chapter).setOnClickListener {
             it.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100).withEndAction {
@@ -160,6 +174,8 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
+    // Загрузка глав из локальной базы данных (Room) с использованием Flow
+    // Автоматически обновляет список при изменениях в БД
     private fun loadChaptersFromRoom() {
         lifecycleScope.launch {
             database.chapterDao()
@@ -174,6 +190,8 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
+    // Показ диалога для создания новой главы
+    // Создает главу в локальной БД и при необходимости синхронизирует с облаком
     private fun showAddChapterDialog() {
         val view = layoutInflater.inflate(R.layout.add_chapter_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.edit_title)
@@ -218,6 +236,8 @@ class BookActivity : AppCompatActivity() {
             .show()
     }
 
+    // Удаление главы с подтверждением через диалог
+    // Удаляет из локальной БД, синхронизирует с облаком и обновляет UI
     private fun deleteChapter(chapter: Chapter) {
         MaterialAlertDialogBuilder(this)
             .setTitle("Удалить главу?")
@@ -276,6 +296,8 @@ class BookActivity : AppCompatActivity() {
             .show()
     }
 
+    // Пересчет позиций глав после удаления одной из них
+    // Смещает все последующие главы на одну позицию вверх
     private suspend fun reorderPositionsAfterDeletion(deletedPosition: Int) {
         val affected = database.chapterDao()
             .getChaptersForBookSync(book.id)
@@ -294,6 +316,8 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
+    // Переключение статуса "Избранное" для главы
+    // Обновляет локальную БД и синхронизирует с облаком
     private fun toggleFavorite(chapter: Chapter) {
         lifecycleScope.launch {
             val entity = database.chapterDao().getChaptersForBookSync(book.id)
@@ -317,6 +341,8 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
+    // Открытие редактора главы в отдельной активности
+    // Использует ланчер для получения результата редактирования
     private fun openChapterEditor(chapter: Chapter, position: Int) {
         val intent = Intent(this, ChapterEditActivity::class.java).apply {
             putExtra(ChapterEditActivity.EXTRA_CHAPTER, chapter)
@@ -327,13 +353,14 @@ class BookActivity : AppCompatActivity() {
         editChapterLauncher.launch(intent)
     }
 
+    // Показ диалога для редактирования названия и описания главы
     private fun showEditChapterDialog(chapter: Chapter) {
         val view = layoutInflater.inflate(R.layout.add_chapter_dialog, null)
         val editTitle = view.findViewById<TextInputEditText>(R.id.edit_title)
         val editDescription = view.findViewById<TextInputEditText>(R.id.edit_description)
 
         editTitle.setText(chapter.title)
-        editDescription?.setText(chapter.description)  // ← description
+        editDescription?.setText(chapter.description)
 
         MaterialAlertDialogBuilder(this)
             .setTitle("Редактировать главу")
@@ -373,7 +400,8 @@ class BookActivity : AppCompatActivity() {
             .show()
     }
 
-
+    // Настройка drag-and-drop для перемещения глав в списке
+    // Сохраняет новые позиции в БД после завершения перемещения
     private fun setupDragAndDrop() {
         val helper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
@@ -401,6 +429,7 @@ class BookActivity : AppCompatActivity() {
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
 
+            // Вызывается после завершения перемещения. Обновляет позиции в БД
             override fun clearView(rv: RecyclerView, vh: RecyclerView.ViewHolder) {
                 super.clearView(rv, vh)
 
@@ -435,6 +464,8 @@ class BookActivity : AppCompatActivity() {
         helper.attachToRecyclerView(recyclerView)
     }
 
+    // Показ подробной информации о главе в диалоге
+    // Отображает все метаданные главы и предлагает перейти к редактированию
     private fun showChapterInfo(chapter: Chapter) {
         val df = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
         val created = if (chapter.createdAt != 0L) df.format(Date(chapter.createdAt)) else "—"
@@ -459,6 +490,8 @@ class BookActivity : AppCompatActivity() {
             .show()
     }
 
+    // Загрузка главы в облако (Firestore)
+    // Выполняется в фоновом потоке, не блокирует UI
     private fun uploadChapterToCloud(chapterEntity: ChapterEntity) {
         val user = auth.currentUser ?: return
 
@@ -495,11 +528,14 @@ class BookActivity : AppCompatActivity() {
         }
     }
 
+    // Обработка нажатия кнопки "Назад" в Toolbar
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
     }
 
+    // Очистка ресурсов при уничтожении активности
+    // BackgroundScope не отменяется, чтобы синхронизация могла завершиться
     override fun onDestroy() {
         super.onDestroy()
         // backgroundScope живёт дальше — главы всё равно будут синхронизированы
