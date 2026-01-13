@@ -7,6 +7,9 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+// Определение Room Database с сущностями BookEntity и ChapterEntity
+// version = 6 - текущая версия базы данных
+// exportSchema = true - включение экспорта схемы для анализа структуры БД
 @Database(
     entities = [BookEntity::class, ChapterEntity::class],
     version = 6,
@@ -14,6 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 )
 abstract class AppDatabase : RoomDatabase() {
 
+    // DAO (Data Access Object) интерфейсы для работы с таблицами
     abstract fun bookDao(): BookDao
     abstract fun chapterDao(): ChapterDao
 
@@ -21,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        // Миграция с версии 1 на 2: добавление поля updatedAt в таблицу chapters
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -30,6 +35,8 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Миграция с версии 2 на 3: полная реструктуризация таблицы books
+        // Добавление полей createdAt и cloudSynced, создание новой таблицы и копирование данных
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -57,9 +64,10 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Миграция с версии 3 на 4: полный рефакторинг таблицы chapters
+        // Генерация новых ID, добавление полей createdAt/updatedAt, создание индексов
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // создаём новую таблицу
                 db.execSQL("""
             CREATE TABLE chapters_new (
                 chapterId TEXT NOT NULL PRIMARY KEY,
@@ -75,7 +83,7 @@ abstract class AppDatabase : RoomDatabase() {
             )
         """.trimIndent())
 
-                // переносим данные, создавая createdAt/updatedAt заново
+                // Перенос данных с генерацией новых ID и временных меток
                 db.execSQL("""
             INSERT INTO chapters_new (
                 chapterId, bookId, position,
@@ -84,7 +92,7 @@ abstract class AppDatabase : RoomDatabase() {
                 createdAt, updatedAt
             )
             SELECT
-                lower(hex(randomblob(16))), -- новый chapterId
+                lower(hex(randomblob(16))), -- генерация нового UUID
                 bookId,
                 position,
                 title,
@@ -92,21 +100,21 @@ abstract class AppDatabase : RoomDatabase() {
                 date,
                 IFNULL(wordCount, 0),
                 IFNULL(isFavorite, 0),
-                strftime('%s','now')*1000,   -- создаём createdAt
-                strftime('%s','now')*1000    -- создаём updatedAt
+                strftime('%s','now')*1000,   -- текущее время в миллисекундах
+                strftime('%s','now')*1000
             FROM chapters
         """.trimIndent())
 
-                // удаляем старую таблицу
                 db.execSQL("DROP TABLE chapters")
                 db.execSQL("ALTER TABLE chapters_new RENAME TO chapters")
 
-                // создаём индексы
+                // Создание индексов для оптимизации запросов
                 db.execSQL("CREATE INDEX index_chapters_position ON chapters(position)")
                 db.execSQL("CREATE INDEX index_chapters_bookId ON chapters(bookId)")
             }
         }
 
+        // Миграция с версии 4 на 5: добавление поля content для хранения текста главы
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -116,9 +124,10 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Миграция с версии 5 на 6 - проверка и создание индексов
+        // Используется IF NOT EXISTS для безопасности (До этого приложение падало)
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // проверяем и создаем недостающие индексы
                 db.execSQL("""
                     CREATE INDEX IF NOT EXISTS index_chapters_position 
                     ON chapters(position)
@@ -131,6 +140,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Общий метод для получения экземпляра базы данных
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -145,7 +155,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6
                     )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration() // Разрушительное восстановление при ошибках миграции
                     .build()
                 INSTANCE = instance
                 instance

@@ -92,7 +92,7 @@ class BookAdapter(
                     true
                 }
                 R.id.action_export -> {
-                    onExportBook(book)  // Вызываем callback для экспорта
+                    onExportBook(book)  // вызываем callback для экспорта
                     true
                 }
                 else -> false

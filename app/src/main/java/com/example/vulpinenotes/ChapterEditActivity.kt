@@ -50,13 +50,13 @@ class ChapterEditActivity : AppCompatActivity() {
 
     private var isPreviewVisible = false
 
-    // Undo/Redo с хранением текста + курсора
+    // undo/redo с хранением текста + курсора
     private data class EditState(val text: String, val cursor: Int)
     private val undoStack = ArrayDeque<EditState>()
     private val redoStack = ArrayDeque<EditState>()
     private var isInternalChange = false // чтобы не писать состояние при Undo/Redo или автоподстановке
 
-    // Для отслеживания предыдущего состояния в TextWatcher
+    // для отслеживания предыдущего состояния в TextWatcher
     private var previousText = ""
     private var previousCursor = 0
     private var isTextChangedByUser = true
@@ -69,7 +69,7 @@ class ChapterEditActivity : AppCompatActivity() {
         binding = ActivityChapterEditBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Toolbar
+        // toolbar
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             setDisplayShowTitleEnabled(false)
@@ -81,13 +81,13 @@ class ChapterEditActivity : AppCompatActivity() {
         firestore = FirebaseFirestore.getInstance()
         auth = FirebaseAuth.getInstance()
 
-        // Инициализация Markwon с поддержкой таблиц и HTML
+        // инициализация Markwon с поддержкой таблиц и HTML
         markwon = Markwon.builder(this)
             .usePlugin(HtmlPlugin.create())
             .usePlugin(TablePlugin.create(this))
             .build()
 
-        // Получение данных
+        // получение данных
         chapter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(EXTRA_CHAPTER, Chapter::class.java)
         } else {
@@ -103,14 +103,14 @@ class ChapterEditActivity : AppCompatActivity() {
         binding.chapterTitleTextView.text = chapter.title
         binding.contentEditText.setText(chapter.content)
 
-        // Инициализация состояния для undo/redo
+        // инициализация состояния для undo/redo
         saveStateToUndoStack()
 
-        // Заголовок
+        // заголовок
         binding.chapterTitleTextView.setOnClickListener { showEditTitleDialog() }
         binding.toolbar.setNavigationOnClickListener { saveAndExit() }
 
-        // Форматирование
+        // форматирование
         binding.btnBold.setOnClickListener { applyInline("**", "**") }
         binding.btnItalic.setOnClickListener { applyInline("_", "_") }
         binding.btnUnderline.setOnClickListener { applyInline("<u>", "</u>") }
@@ -124,19 +124,19 @@ class ChapterEditActivity : AppCompatActivity() {
 
         binding.btnQuote.setOnClickListener { applyLinePrefix("> ") }
 
-        // Новые кнопки
+        // новые кнопки
         binding.btnTable.setOnClickListener { showTableDialog() }
         binding.btnDivider.setOnClickListener { insertDivider() }
         binding.btnClear.setOnClickListener { clearFormatting() }
 
-        // Undo/Redo
+        // undo/Redo
         binding.btnUndo.setOnClickListener { undo() }
         binding.btnRedo.setOnClickListener { redo() }
 
-        // Preview
+        // preview
         binding.previewButton.setOnClickListener { togglePreview() }
 
-        // TextWatcher для Undo/Redo + автоподстановки списков
+        // textWatcher для undo/redo + автоподстановки списков
         binding.contentEditText.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
                 previousText = binding.contentEditText.text.toString()
@@ -161,13 +161,13 @@ class ChapterEditActivity : AppCompatActivity() {
             }
         })
 
-        // Обработка клавиш для улучшенного управления списками
+        // обработка клавиш для улучшенного управления списками
         binding.contentEditText.setOnKeyListener { _, keyCode, event ->
             if (keyCode == android.view.KeyEvent.KEYCODE_ENTER &&
                 event.action == android.view.KeyEvent.ACTION_DOWN
             ) {
                 handleListContinuation()
-                true // Поглощаем событие, так как сами вставляем текст
+                true // поглощаем событие, так как сами вставляем текст
             } else false
         }
 
@@ -175,14 +175,14 @@ class ChapterEditActivity : AppCompatActivity() {
 
         setupWindowInsets()
 
-        // Добавляем слушатель фокуса для обновления отступов при появлении клавиатуры
+        // добавляем слушатель фокуса для обновления отступов при появлении клавиатуры
         setupFocusListener()
     }
 
     private fun setupFocusListener() {
         binding.contentEditText.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                // При получении фокуса обновляем отступы
+                // при получении фокуса обновляем отступы
                 updateEditTextPadding()
             }
         }
@@ -198,13 +198,13 @@ class ChapterEditActivity : AppCompatActivity() {
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
 
-            // AppBar под статусбар
+            // appBar под статусбар
             binding.appbar.setPadding(0, systemBars.top, 0, 0)
 
-            // Обновляем отступы для EditText с учетом клавиатуры и панели форматирования
+            // обновляем отступы для EditText с учетом клавиатуры и панели форматирования
             updateEditTextPadding(ime.bottom > 0, ime.bottom)
 
-            // Обновляем отступы для предпросмотра
+            // обновляем отступы для предпросмотра
             val previewBottomPadding = if (ime.bottom > 0) {
                 dpToPx(100) + ime.bottom
             } else {
@@ -220,7 +220,7 @@ class ChapterEditActivity : AppCompatActivity() {
                 previewBottomPadding
             )
 
-            // Меняем margin панели форматирования вместо translationY
+            // меняем margin панели форматирования вместо translationY
             val params = binding.formattingBar.layoutParams as CoordinatorLayout.LayoutParams
             if (ime.bottom > 0) {
                 params.bottomMargin = ime.bottom
@@ -235,18 +235,17 @@ class ChapterEditActivity : AppCompatActivity() {
     }
 
 
-    private fun updateEditTextPadding(keyboardVisible: Boolean = false, keyboardHeight: Int = 0) {
+    private fun updateEditTextPadding(
+        keyboardVisible: Boolean = false,
+        keyboardHeight: Int = 0
+    ) {
         val paddingHorizontal = dpToPx(24)
         val paddingTop = dpToPx(16)
 
         val paddingBottom = if (keyboardVisible) {
-            // Высота панели форматирования + дополнительный отступ
-            val formattingBarHeight = binding.formattingBar.height
-            formattingBarHeight + keyboardHeight + dpToPx(16)
+            binding.formattingBar.height + keyboardHeight + dpToPx(16)
         } else {
-            // Просто отступ для панели форматирования
-            val formattingBarHeight = binding.formattingBar.height
-            formattingBarHeight + dpToPx(32)
+            binding.formattingBar.height + dpToPx(32)
         }
 
         binding.contentEditText.setPadding(
@@ -255,28 +254,6 @@ class ChapterEditActivity : AppCompatActivity() {
             paddingHorizontal,
             paddingBottom
         )
-
-        // Автопрокрутка к курсору
-        if (keyboardVisible) {
-            scrollToCursorDelayed()
-        }
-    }
-
-    private fun scrollToCursorDelayed() {
-        binding.contentEditText.postDelayed({
-            val editText = binding.contentEditText
-            val selectionStart = editText.selectionStart
-            if (selectionStart >= 0) {
-                val layout = editText.layout
-                if (layout != null) {
-                    val line = layout.getLineForOffset(selectionStart)
-                    val lineBottom = layout.getLineBottom(line)
-
-                    // Прокручиваем так, чтобы строка с курсором была видимой
-                    editText.scrollTo(0, lineBottom - editText.height + editText.paddingBottom)
-                }
-            }
-        }, 100)
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -300,10 +277,10 @@ class ChapterEditActivity : AppCompatActivity() {
             val currentText = binding.contentEditText.text.toString()
             val currentCursor = binding.contentEditText.selectionStart
 
-            // Сохраняем предыдущее состояние в стек undo
+            // сохраняем предыдущее состояние в стек undo
             undoStack.addLast(EditState(previousText, previousCursor))
             if (undoStack.size > 100) undoStack.removeFirst()
-            redoStack.clear() // Очищаем стек redo при новом действии пользователя
+            redoStack.clear() // очищаем стек redo при новом действии пользователя
 
             previousText = currentText
             previousCursor = currentCursor
@@ -333,25 +310,25 @@ class ChapterEditActivity : AppCompatActivity() {
         val text = edit.text ?: return
         val cursor = edit.selectionStart
 
-        // Находим начало текущей строки
+        // находим начало текущей строки
         val lineStart = text.lastIndexOf('\n', cursor - 1).let { if (it == -1) 0 else it + 1 }
         val line = text.substring(lineStart, cursor)
 
-        // Получаем предыдущую строку для определения типа списка
+        // получаем предыдущую строку для определения типа списка
         val prevLineStart = text.lastIndexOf('\n', lineStart - 2).let {
             if (it == -1) 0 else it + 1
         }
         val prevLine = text.substring(prevLineStart, lineStart - 1)
 
-        // Проверяем, является ли предыдущая строка элементом списка
+        // проверяем, является ли предыдущая строка элементом списка
         val insertText: String? = when {
-            // Маркированный список: "- элемент" или "-"
+            // маркированный список: "- элемент" или "-"
             prevLine.trimStart().matches(Regex("^-\\s.*")) -> {
-                // Если текущая строка пустая или содержит только "-", продолжаем список
+                // если текущая строка пустая или содержит только "-", продолжаем список
                 if (line.trim().isEmpty() || line.trim() == "-") "\n- "
                 else null
             }
-            // Нумерованный список: "1. элемент" или "1."
+            // нумерованный список: "1. элемент" или "1."
             prevLine.trimStart().matches(Regex("^\\d+\\.\\s.*")) -> {
                 val numberMatch = Regex("^(\\d+)\\.").find(prevLine.trimStart())
                 if (numberMatch != null) {
@@ -361,7 +338,7 @@ class ChapterEditActivity : AppCompatActivity() {
                     } else null
                 } else null
             }
-            // Цитата: "> текст"
+            // цитата: "> текст"
             prevLine.trimStart().startsWith("> ") -> {
                 if (line.trim().isEmpty()) "\n> "
                 else null
@@ -380,7 +357,7 @@ class ChapterEditActivity : AppCompatActivity() {
     private fun undo() {
         if (undoStack.isNotEmpty()) {
             isInternalChange = true
-            // Сохраняем текущее состояние в стек redo
+            // сохраняем текущее состояние в стек redo
             val currentState = EditState(
                 binding.contentEditText.text.toString(),
                 binding.contentEditText.selectionStart
@@ -388,15 +365,15 @@ class ChapterEditActivity : AppCompatActivity() {
             redoStack.addLast(currentState)
             if (redoStack.size > 100) redoStack.removeFirst()
 
-            // Восстанавливаем предыдущее состояние
+            // восстанавливаем предыдущее состояние
             val previousState = undoStack.removeLast()
             binding.contentEditText.setText(previousState.text)
 
-            // Устанавливаем курсор на сохраненную позицию
+            // устанавливаем курсор на сохраненную позицию
             val cursor = previousState.cursor.coerceIn(0, previousState.text.length)
             binding.contentEditText.setSelection(cursor)
 
-            // Обновляем предыдущие значения
+            // обновляем предыдущие значения
             previousText = previousState.text
             previousCursor = cursor
 
@@ -407,7 +384,7 @@ class ChapterEditActivity : AppCompatActivity() {
     private fun redo() {
         if (redoStack.isNotEmpty()) {
             isInternalChange = true
-            // Сохраняем текущее состояние в стек undo
+            // сохраняем текущее состояние в стек undo
             val currentState = EditState(
                 binding.contentEditText.text.toString(),
                 binding.contentEditText.selectionStart
@@ -415,15 +392,15 @@ class ChapterEditActivity : AppCompatActivity() {
             undoStack.addLast(currentState)
             if (undoStack.size > 100) undoStack.removeFirst()
 
-            // Восстанавливаем состояние из redo
+            // восстанавливаем состояние из redo
             val nextState = redoStack.removeLast()
             binding.contentEditText.setText(nextState.text)
 
-            // Устанавливаем курсор на сохраненную позицию
+            // устанавливаем курсор на сохраненную позицию
             val cursor = nextState.cursor.coerceIn(0, nextState.text.length)
             binding.contentEditText.setSelection(cursor)
 
-            // Обновляем предыдущие значения
+            // обновляем предыдущие значения
             previousText = nextState.text
             previousCursor = cursor
 
@@ -499,7 +476,7 @@ class ChapterEditActivity : AppCompatActivity() {
                 val rows = etRows.text.toString().toIntOrNull() ?: 2
                 val cols = etCols.text.toString().toIntOrNull() ?: 2
 
-                // Проверяем корректность значений
+                // проверяем корректность значений
                 if (rows < 1 || rows > 10 || cols < 1 || cols > 6) {
                     Toast.makeText(
                         this,
@@ -524,23 +501,22 @@ class ChapterEditActivity : AppCompatActivity() {
 
         val tableMarkdown = buildString {
 
-            // ❗ ОБЯЗАТЕЛЬНО: пустая строка перед таблицей
             if (cursor > 0 && text[cursor - 1] != '\n') {
                 append("\n")
             }
             append("\n")
 
-            // Заголовки
+            // заголовки
             append("|")
             repeat(cols) { append(" Header ${it + 1} |") }
             append("\n")
 
-            // Разделитель (КРИТИЧНО для Markwon)
+            // разделитель
             append("|")
             repeat(cols) { append(" --- |") }
             append("\n")
 
-            // Данные
+            // данные
             repeat(rows) { row ->
                 append("|")
                 repeat(cols) { col ->
@@ -554,7 +530,7 @@ class ChapterEditActivity : AppCompatActivity() {
 
         text.insert(cursor, tableMarkdown)
 
-        // Курсор в первую ячейку данных
+        // курсор в первую ячейку данных
         val firstCellOffset = tableMarkdown.indexOf("|", tableMarkdown.indexOf("\n") + 1) + 2
         edit.setSelection((cursor + firstCellOffset).coerceAtMost(text.length))
 
@@ -563,14 +539,13 @@ class ChapterEditActivity : AppCompatActivity() {
         refreshPreview()
     }
 
-    // ===================== ФУНКЦИЯ ДЛЯ РАЗДЕЛИТЕЛЯ =====================
     private fun insertDivider() {
         isTextChangedByUser = false
         val edit = binding.contentEditText
         val text = edit.text ?: return
         val cursor = edit.selectionStart
 
-        // Проверяем, нужно ли добавить переносы строк
+        // проверяем, нужно ли добавить переносы строк
         val divider = buildString {
             if (cursor > 0 && text[cursor - 1] != '\n') {
                 append("\n")
@@ -582,7 +557,7 @@ class ChapterEditActivity : AppCompatActivity() {
         }
 
         text.insert(cursor, divider)
-        // Ставим курсор после разделителя
+        // ставим курсор после разделителя
         edit.setSelection(cursor + divider.length - 1)
 
         isTextChangedByUser = true
@@ -608,7 +583,7 @@ class ChapterEditActivity : AppCompatActivity() {
                 isTextChangedByUser = false
                 val selected = text.subSequence(start, end).toString()
 
-                // Улучшенная очистка форматирования
+                // улучшенная очистка форматирования
                 val plainText = selected
                     // 1. Удаляем HTML теги (включая самозакрывающиеся)
                     .replace(Regex("<[^>]+>"), "")
@@ -683,18 +658,18 @@ class ChapterEditActivity : AppCompatActivity() {
         val inputMethodManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
 
         if (isPreviewVisible) {
-            // Переключаемся в режим редактирования
+            // переключаемся в режим редактирования
             binding.previewTextView.visibility = View.GONE
             binding.contentEditText.visibility = View.VISIBLE
 
-            // Обновляем отступы для EditText с учетом текущего состояния клавиатуры
+            // обновляем отступы для EditText с учетом текущего состояния клавиатуры
             val imeBottom = ViewCompat.getRootWindowInsets(binding.main)
                 ?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
             updateEditTextPadding(imeBottom > 0, imeBottom)
 
             binding.previewButton.text = "Предпросмотр"
 
-            // Показываем клавиатуру
+            // показываем клавиатуру
             binding.contentEditText.requestFocus()
             binding.contentEditText.postDelayed({
                 inputMethodManager.showSoftInput(binding.contentEditText, InputMethodManager.SHOW_IMPLICIT)
@@ -702,17 +677,17 @@ class ChapterEditActivity : AppCompatActivity() {
 
             isPreviewVisible = false
         } else {
-            // Переключаемся в режим предпросмотра
+            // переключаемся в режим предпросмотра
 
-            // Скрываем клавиатуру
+            // скрываем клавиатуру
             inputMethodManager.hideSoftInputFromWindow(binding.contentEditText.windowToken, 0)
 
-            // Даем время на скрытие клавиатуры, затем показываем предпросмотр
+            // даем время на скрытие клавиатуры, затем показываем предпросмотр
             binding.contentEditText.postDelayed({
                 binding.previewTextView.visibility = View.VISIBLE
                 binding.contentEditText.visibility = View.GONE
 
-                // Отступы для предпросмотра (клавиатура уже скрыта)
+                // отступы для предпросмотра (клавиатура уже скрыта)
                 val paddingHorizontal = dpToPx(24)
                 val paddingTop = dpToPx(16)
                 val formattingBarHeight = binding.formattingBar.height

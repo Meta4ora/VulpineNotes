@@ -67,11 +67,11 @@ dependencies {
     // Firebase BOM (управляет всеми версиями Firebase)
     implementation(platform("com.google.firebase:firebase-bom:34.5.0"))
 
-    // Основные Firebase модули (без -ktx — KTX встроено)
+    // Основные Firebase модули
     implementation("com.google.firebase:firebase-analytics")  // Аналитика (без -ktx)
     implementation("com.google.firebase:firebase-firestore")  // Firestore (основной модуль)
     implementation("com.google.firebase:firebase-auth")       // Auth (основной)
-    implementation("com.google.firebase:firebase-storage")    // Storage (если нужно для обложек)
+    implementation("com.google.firebase:firebase-storage")    // Storage (у меня план не позволяет но пусть будет)
     implementation("com.google.firebase:firebase-firestore-ktx:24.10.3")
     implementation("com.google.firebase:firebase-database")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")

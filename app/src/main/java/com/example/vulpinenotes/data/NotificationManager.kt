@@ -36,10 +36,13 @@ class NotificationManager(
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val notificationManager = NotificationManagerCompat.from(context)
 
+    // Инициализация менеджера уведомлений. Создает канал уведомлений для Android 8.0+
     init {
         createChannel()
     }
 
+    // Создание канала уведомлений (обязательно для Android 8.0+)
+    // Канал определяет настройки отображения и поведения уведомлений
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Напоминания"
@@ -52,6 +55,8 @@ class NotificationManager(
         }
     }
 
+    // Планирование уведомления по настройкам пользователя
+    // Создает PendingIntent для AlarmManager с выбранными книгами
     fun schedule(settings: NotificationSettings) {
         cancel()
 
@@ -99,6 +104,8 @@ class NotificationManager(
         }
     }
 
+    // Отмена запланированного уведомления
+    // Находит и отменяет PendingIntent в AlarmManager
     fun cancel() {
         val intent = Intent(context, NotificationReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
@@ -114,9 +121,11 @@ class NotificationManager(
         }
     }
 
+    // Показ уведомления с напоминанием о выбранных книгах
+    // Загружает данные книг и создает уведомление с кликабельной ссылкой на приложение
     fun show(bookIds: List<String>) {
         CoroutineScope(Dispatchers.IO).launch {
-            // Проверяем разрешение на уведомления для Android 13+
+            // проверяем разрешение на уведомления для Android 13+
             if (!hasNotificationPermission()) {
                 Log.e("NotificationManager", "Нет разрешения на отправку уведомлений")
                 return@launch
@@ -161,6 +170,8 @@ class NotificationManager(
         }
     }
 
+    // Проверка разрешения на использование точных будильников (Android 12+)
+    // Для Android S (API 31) и выше требуется специальное разрешение
     private fun hasAlarmPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
@@ -170,11 +181,12 @@ class NotificationManager(
                 false
             }
         } else {
-            true // Для версий ниже Android 12 разрешение не требуется
+            true // для версий ниже Android 12 разрешение не требуется
         }
     }
 
-    // Проверка разрешения на уведомления (Android 13+)
+    // Проверка разрешения на отправку уведомлений (Android 13+)
+    // Для Android Tiramisu (API 33) и выше требуется разрешение POST_NOTIFICATIONS
     private fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ActivityCompat.checkSelfPermission(
@@ -182,18 +194,22 @@ class NotificationManager(
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else {
-            true // Для версий ниже Android 13 разрешение не требуется
+            true // для версий ниже Android 13 разрешение не требуется
         }
     }
 }
 
-
+// BroadcastReceiver для получения сигналов от AlarmManager
+// Запускается по расписанию и вызывает показ уведомления
 class NotificationReceiver : BroadcastReceiver() {
+    // Получение broadcast от AlarmManager. Создает экземпляр NotificationManager
+    // и показывает уведомление с напоминанием о книгах
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != NotificationManager.ACTION_SHOW_NOTIFICATION) return
 
         val bookIds = intent.getStringArrayExtra("book_ids")?.toList() ?: return
 
+        // Инициализация зависимостей для создания репозитория
         val database = AppDatabase.getDatabase(context)
         val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
         val storageDir = context.filesDir.resolve("covers").apply { mkdirs() }
@@ -205,6 +221,7 @@ class NotificationReceiver : BroadcastReceiver() {
             storageDir
         )
 
+        // Создание и показ уведомления
         NotificationManager(context, repository).show(bookIds)
     }
 }
