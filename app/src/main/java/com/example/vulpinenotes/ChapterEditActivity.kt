@@ -167,7 +167,7 @@ class ChapterEditActivity : AppCompatActivity() {
                 event.action == android.view.KeyEvent.ACTION_DOWN
             ) {
                 handleListContinuation()
-                true // Поглощаем событие, так как сами вставляем текст
+                true // поглощаем событие, так как сами вставляем текст
             } else false
         }
 
@@ -235,18 +235,17 @@ class ChapterEditActivity : AppCompatActivity() {
     }
 
 
-    private fun updateEditTextPadding(keyboardVisible: Boolean = false, keyboardHeight: Int = 0) {
+    private fun updateEditTextPadding(
+        keyboardVisible: Boolean = false,
+        keyboardHeight: Int = 0
+    ) {
         val paddingHorizontal = dpToPx(24)
         val paddingTop = dpToPx(16)
 
         val paddingBottom = if (keyboardVisible) {
-            // высота панели форматирования + дополнительный отступ
-            val formattingBarHeight = binding.formattingBar.height
-            formattingBarHeight + keyboardHeight + dpToPx(16)
+            binding.formattingBar.height + keyboardHeight + dpToPx(16)
         } else {
-            // просто отступ для панели форматирования
-            val formattingBarHeight = binding.formattingBar.height
-            formattingBarHeight + dpToPx(32)
+            binding.formattingBar.height + dpToPx(32)
         }
 
         binding.contentEditText.setPadding(
@@ -255,28 +254,6 @@ class ChapterEditActivity : AppCompatActivity() {
             paddingHorizontal,
             paddingBottom
         )
-
-        // автопрокрутка к курсору
-        if (keyboardVisible) {
-            scrollToCursorDelayed()
-        }
-    }
-
-    private fun scrollToCursorDelayed() {
-        binding.contentEditText.postDelayed({
-            val editText = binding.contentEditText
-            val selectionStart = editText.selectionStart
-            if (selectionStart >= 0) {
-                val layout = editText.layout
-                if (layout != null) {
-                    val line = layout.getLineForOffset(selectionStart)
-                    val lineBottom = layout.getLineBottom(line)
-
-                    // прокручиваем так, чтобы строка с курсором была видимой
-                    editText.scrollTo(0, lineBottom - editText.height + editText.paddingBottom)
-                }
-            }
-        }, 100)
     }
 
     private fun dpToPx(dp: Int): Int {
